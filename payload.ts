@@ -32,7 +32,7 @@ export interface SitePayload {
 export async function buildPayload(sb: SupabaseClient): Promise<SitePayload> {
   const { data } = await sb
     .from("restaurants")
-    .select("id, name, tier, visited_on, photo_file_id, ratings(telegram_id, food, ambiance, aesthetics, service)");
+    .select("id, name, tier, visited_on, photo_file_id, photo_url, ratings(telegram_id, food, ambiance, aesthetics, service)");
 
   const names = await peopleMap(sb);
   const people: SitePerson[] = [...names.entries()].map(([id, name]) => ({ id, name }));
@@ -76,7 +76,7 @@ export async function buildPayload(sb: SupabaseClient): Promise<SitePayload> {
       name: r.name,
       tier: r.tier,
       visited_on: r.visited_on,
-      photo: Boolean(r.photo_file_id),
+      photo: Boolean(r.photo_file_id || r.photo_url),
       combined: combinedScore(done, r.tier),
       gap: disagreement(done, r.tier),
       scores: done.map((x: any) => ({
