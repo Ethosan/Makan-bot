@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#DCE0D5">
+<title>The List</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Karla:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#DCE0D5; --card:#F1F3EB; --ink:#191E19; --muted:#6B7368; --rule:#BDC4B3;
+  --brass:#9C7C2E; --spark:#B0432A; --p1:#2E6B57; --p2:#7A4B86;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --serif:"Instrument Serif",Georgia,serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:"Karla",system-ui,sans-serif;
+  font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding:26px 20px calc(96px + env(safe-area-inset-bottom))}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
+.mast{border-bottom:2px solid var(--ink);padding-bottom:12px}
+.mast h1{font-family:var(--serif);font-weight:400;font-size:clamp(42px,13vw,74px);
+  line-height:.9;letter-spacing:-.02em;margin:0}
+.sub{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);
+  font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-top:11px}
+.key{display:flex;gap:13px}
+.who{display:flex;gap:6px;align-items:center}
+.swatch{width:9px;height:9px;border-radius:50%}
+.me{text-decoration:underline;text-underline-offset:3px}
+
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin:20px 0 0}
+.filters button{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 12px;border:1px solid var(--rule);background:none;color:var(--muted);
+  border-radius:999px;cursor:pointer;transition:.16s}
+.filters button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+
+.entry{display:grid;grid-template-columns:36px 1fr;gap:0 14px;padding:22px 0;
+  border-bottom:1px solid var(--rule)}
+.rank{font-family:var(--serif);font-size:29px;line-height:1;color:var(--brass);padding-top:2px}
+.rank.plain{color:var(--rule)}
+.head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.name{font-family:var(--serif);font-size:25px;line-height:1.12;margin:0}
+.total{font-family:var(--mono);font-size:19px;font-variant-numeric:tabular-nums}
+.meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-top:5px}
+
+.track{position:relative;height:27px;margin:14px 0 2px;grid-column:2}
+.axis{position:absolute;top:12px;left:0;right:0;height:1px;background:var(--rule)}
+.span{position:absolute;top:11px;height:3px;background:var(--ink);opacity:.22;border-radius:2px}
+.span.wide{background:var(--spark);opacity:.5}
+.dot{position:absolute;top:6px;width:13px;height:13px;border-radius:50%;margin-left:-6.5px;
+  border:2px solid var(--paper)}
+.dot span{position:absolute;top:15px;left:50%;transform:translateX(-50%);font-family:var(--mono);
+  font-size:9.5px;color:var(--muted)}
+.ticks{position:absolute;top:-3px;left:0;right:0;display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:9px;color:var(--rule)}
+
+.photo{grid-column:2;margin-top:14px;border-radius:3px;overflow:hidden;background:var(--card)}
+.photo img{display:block;width:100%;height:auto;max-height:320px;object-fit:cover}
+.acts{grid-column:2;margin-top:11px;display:flex;gap:16px}
+.link{background:none;border:0;padding:0;cursor:pointer;font-family:var(--mono);font-size:10px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule)}
+.link:hover{color:var(--ink)}
+.breakdown{grid-column:2;margin-top:12px;display:none}
+.breakdown.open{display:block}
+.bd{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;font-family:var(--mono);
+  font-size:11.5px;padding:4px 0;border-bottom:1px dotted var(--rule)}
+.bd span:first-child{letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.bd b{font-weight:500;font-variant-numeric:tabular-nums;min-width:22px;text-align:right}
+
+.label{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);margin:38px 0 4px}
+.pend{display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:12px;
+  color:var(--muted);padding:9px 0;border-bottom:1px dotted var(--rule);cursor:pointer;
+  background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left}
+.pend:hover{color:var(--ink)}
+.empty{font-family:var(--serif);font-size:21px;color:var(--muted);padding:50px 0;text-align:center}
+
+.fab{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:20;
+  background:var(--ink);color:var(--card);border:0;border-radius:999px;padding:14px 22px;
+  font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+  cursor:pointer;box-shadow:0 6px 20px rgba(25,30,25,.28)}
+
+.scrim{position:fixed;inset:0;background:rgba(25,30,25,.42);z-index:30;display:none}
+.scrim.open{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--paper);
+  border-top:2px solid var(--ink);border-radius:12px 12px 0 0;max-height:92vh;overflow:auto;
+  padding:22px 20px calc(28px + env(safe-area-inset-bottom));display:none}
+.sheet.open{display:block}
+.sheet-in{max-width:760px;margin:0 auto}
+.sheet h2{font-family:var(--serif);font-weight:400;font-size:30px;margin:0 0 16px}
+.field{margin-bottom:16px}
+.field>label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+input[type=text],input[type=date]{width:100%;padding:11px 12px;border:1px solid var(--rule);
+  background:var(--card);color:var(--ink);border-radius:3px;font:inherit;font-size:16px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;padding:10px 4px;border:1px solid var(--rule);background:var(--card);
+  color:var(--muted);border-radius:3px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.scale{display:flex;gap:3px}
+.scale button{flex:1;aspect-ratio:1;min-width:0;border:1px solid var(--rule);background:var(--card);
+  color:var(--muted);border-radius:3px;font-family:var(--mono);font-size:12px;cursor:pointer;padding:0}
+.scale button[aria-pressed="true"]{color:var(--card);border-color:transparent}
+.cat{margin-bottom:13px}
+.cat label{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.hint{font-family:var(--mono);font-size:10px;color:var(--rule);text-transform:none;letter-spacing:0}
+.row{display:flex;gap:10px;margin-top:22px}
+.btn{flex:1;padding:14px;border:0;border-radius:3px;background:var(--ink);color:var(--card);
+  font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+.btn.ghost{background:none;border:1px solid var(--rule);color:var(--muted)}
+.btn.danger{background:none;border:1px solid var(--spark);color:var(--spark)}
+.note{font-family:var(--mono);font-size:11px;color:var(--spark);margin-top:12px;min-height:16px}
+.thumb{width:100%;max-height:220px;object-fit:cover;border-radius:3px;margin-bottom:8px;display:none}
+.thumb.show{display:block}
+
+.gate{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
+.gate-in{width:100%;max-width:340px}
+.gate h1{font-family:var(--serif);font-weight:400;font-size:58px;line-height:.9;margin:0 0 6px}
+.gate p{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 24px}
+.pick{display:flex;flex-direction:column;gap:8px}
+.pick button{padding:15px;border:1px solid var(--rule);background:var(--card);border-radius:3px;
+  font-family:var(--serif);font-size:23px;color:var(--ink);cursor:pointer;text-align:left;
+  display:flex;align-items:center;gap:11px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="gate-in">
+    <h1>The List</h1>
+    <p id="gate-step">Enter the password</p>
+    <div id="gate-pw">
+      <div class="field">
+        <input type="password" id="pw" autocomplete="current-password" placeholder="Password">
+      </div>
+      <button class="btn" id="pw-go" style="width:100%">Open</button>
+    </div>
+    <div class="pick" id="gate-who" hidden></div>
+    <div class="note" id="gate-note"></div>
+  </div>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <header class="mast"><h1>The List</h1></header>
+  <div class="sub"><span id="count"></span><span class="key" id="key"></span></div>
+  <nav class="filters" id="filters"></nav>
+  <main id="board"></main>
+  <section id="pending"></section>
+</div>
+
+<button class="fab" id="fab" hidden>+ Add a place</button>
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"><div class="sheet-in" id="sheet-in"></div></div>
+
+<script>
+const TIERS = ["cheap","normal","fancy"];
+const TIER_LABEL = {cheap:"Cheap eats", normal:"Normal", fancy:"Fancy"};
+const CATS = ["food","ambiance","aesthetics","service"];
+const HINT = {
+  food:"the cooking alone",
+  ambiance:"noise, lighting, comfort",
+  aesthetics:"plating and interior",
+  service:"the staff"
+};
+
+let PW = localStorage.getItem("makan.pw") || "";
+let ME = Number(localStorage.getItem("makan.me")) || null;
+let DATA = null;
+let filter = "all";
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const colour = i => i % 2 === 0 ? "var(--p1)" : "var(--p2)";
+const idx = id => Math.max(0, (DATA?.people ?? []).findIndex(p => p.id === id));
+const pos = s => ((s - 1) / 9) * 100;
+
+async function api(action, payload = {}) {
+  const res = await fetch("/api", {
+    method: "POST",
+    headers: {"content-type":"application/json"},
+    body: JSON.stringify({ action, password: PW, ...payload })
+  });
+  const out = await res.json().catch(() => ({error:"Server didn't respond"}));
+  if (!res.ok) throw new Error(out.error || "Something went wrong");
+  return out;
+}
+
+/* ---------------- gate ---------------- */
+
+async function unlock(pw) {
+  PW = pw;
+  DATA = await api("list");
+  localStorage.setItem("makan.pw", pw);
+}
+
+function showWho() {
+  $("gate-pw").hidden = true;
+  $("gate-who").hidden = false;
+  $("gate-step").textContent = "Which one are you?";
+  $("gate-who").innerHTML = DATA.people.map((p,i) =>
+    '<button data-id="'+p.id+'"><i class="swatch" style="background:'+colour(i)+'"></i>'+esc(p.name)+'</button>'
+  ).join("") || '<p class="note">No one has used the bot yet. Send it a message in Telegram first.</p>';
+  $("gate-who").querySelectorAll("button").forEach(b => b.onclick = () => {
+    ME = Number(b.dataset.id);
+    localStorage.setItem("makan.me", ME);
+    start();
+  });
+}
+
+$("pw-go").onclick = async () => {
+  $("gate-note").textContent = "";
+  try {
+    await unlock($("pw").value);
+    ME && DATA.people.some(p => p.id === ME) ? start() : showWho();
+  } catch (e) {
+    $("gate-note").textContent = e.message;
+  }
+};
+$("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("pw-go").click(); });
+
+function start() {
+  $("gate").hidden = true;
+  $("app").hidden = false;
+  $("fab").hidden = false;
+  render();
+}
+
+/* ---------------- render ---------------- */
+
+function trackHtml(e) {
+  const sorted = [...e.scores].sort((a,b) => a.total - b.total);
+  const lo = sorted[0], hi = sorted[sorted.length-1];
+  const dots = e.scores.map(s =>
+    '<i class="dot" style="left:'+pos(s.total)+'%;background:'+colour(idx(s.personId))+'">'
+    + '<span>'+s.total.toFixed(1)+'</span></i>').join("");
+  return '<div class="track"><div class="ticks"><span>1</span><span>10</span></div>'
+    + '<div class="axis"></div>'
+    + '<div class="span'+(e.gap>=1.5?" wide":"")+'" style="left:'+pos(lo.total)
+    + '%;width:'+(pos(hi.total)-pos(lo.total))+'%"></div>'+dots+'</div>';
+}
+
+function entryHtml(e) {
+  const rank = filter === "all" ? e.overallRank : e.tierRank;
+  const meta = [TIER_LABEL[e.tier], e.visited_on || "date unknown"];
+  if (e.gap >= 1.5) meta.push("split " + e.gap.toFixed(1));
+  const photo = e.photo_url
+    ? '<div class="photo"><img loading="lazy" alt="" src="'+esc(e.photo_url)+'"></div>' : "";
+  const rows = CATS.map(c => '<div class="bd"><span>'+c+'</span>'
+    + e.scores.map(s => '<b style="color:'+colour(idx(s.personId))+'">'+s[c]+'</b>').join("")
+    + '</div>').join("");
+  return '<article class="entry">'
+    + '<div class="rank'+(rank>3?" plain":"")+'">'+rank+'</div>'
+    + '<div><div class="head"><h2 class="name">'+esc(e.name)+'</h2>'
+    + '<span class="total">'+e.combined.toFixed(2)+'</span></div>'
+    + '<div class="meta">'+meta.join(" &middot; ")+'</div></div>'
+    + trackHtml(e) + photo
+    + '<div class="acts"><button class="link" data-open="'+e.id+'">Open</button>'
+    + '<button class="link" data-bd>All four scores</button></div>'
+    + '<div class="breakdown">'+rows+'</div></article>';
+}
+
+function render() {
+  const list = DATA.entries.filter(e => filter === "all" || e.tier === filter);
+  $("count").textContent = DATA.entries.length + " rated"
+    + (DATA.pending.length ? " · " + DATA.pending.length + " in progress" : "");
+  $("key").innerHTML = DATA.people.map((p,i) =>
+    '<span class="who'+(p.id===ME?" me":"")+'"><i class="swatch" style="background:'+colour(i)+'"></i>'
+    + esc(p.name)+'</span>').join("");
+  $("filters").innerHTML = [["all","Overall"],["cheap","Cheap"],["normal","Normal"],["fancy","Fancy"]]
+    .map(([t,l]) => '<button data-t="'+t+'" aria-pressed="'+(t===filter)+'">'+l+" "+(DATA.counts[t]||0)+'</button>').join("");
+  $("filters").querySelectorAll("button").forEach(b =>
+    b.onclick = () => { filter = b.dataset.t; render(); });
+
+  $("board").innerHTML = list.length ? list.map(entryHtml).join("")
+    : '<p class="empty">Nothing here yet. Add a place below.</p>';
+  $("board").querySelectorAll("[data-bd]").forEach(b => b.onclick = () => {
+    const bd = b.closest(".entry").querySelector(".breakdown");
+    const open = bd.classList.toggle("open");
+    b.textContent = open ? "Hide" : "All four scores";
+  });
+  $("board").querySelectorAll("[data-open]").forEach(b =>
+    b.onclick = () => openSheet(Number(b.dataset.open)));
+
+  $("pending").innerHTML = DATA.pending.length
+    ? '<div class="label">Waiting on a rating</div>' + DATA.pending.map(p =>
+        '<button class="pend" data-open="'+p.id+'"><span>'+esc(p.name)+'</span><span>'+esc(p.progress)+'</span></button>').join("")
+    : "";
+  $("pending").querySelectorAll("[data-open]").forEach(b =>
+    b.onclick = () => openSheet(Number(b.dataset.open)));
+}
+
+/* ---------------- sheet ---------------- */
+
+function closeSheet() {
+  $("sheet").classList.remove("open");
+  $("scrim").classList.remove("open");
+}
+$("scrim").onclick = closeSheet;
+$("fab").onclick = () => openSheet(null);
+
+function find(id) {
+  return DATA.entries.find(e => e.id === id) || DATA.pending.find(e => e.id === id) || null;
+}
+
+function openSheet(id) {
+  const e = id === null ? null : find(id);
+  const mine = e ? (e.ratings.find(r => r.personId === ME) || {}) : {};
+  const draft = {
+    name: e?.name ?? "",
+    tier: e?.tier ?? "normal",
+    visited_on: e?.visited_on ?? "",
+    photo_url: e?.photo_url ?? null,
+    dataUrl: null,
+    scores: Object.fromEntries(CATS.map(c => [c, mine[c] ?? null]))
+  };
+
+  $("sheet-in").innerHTML =
+    '<h2>' + (e ? esc(e.name) : "Add a place") + '</h2>'
+    + '<div class="field"><label for="f-name">Name</label>'
+    + '<input type="text" id="f-name" value="'+esc(draft.name)+'" placeholder="Where did you go?"></div>'
+    + '<div class="field"><label>Kind of place</label><div class="seg" id="f-tier">'
+    + TIERS.map(t => '<button data-t="'+t+'" aria-pressed="'+(t===draft.tier)+'">'+TIER_LABEL[t]+'</button>').join("")
+    + '</div></div>'
+    + '<div class="field"><label for="f-date">When</label>'
+    + '<input type="date" id="f-date" value="'+esc(draft.visited_on)+'"></div>'
+    + '<div class="field"><label>Photo</label>'
+    + '<img class="thumb'+(draft.photo_url?" show":"")+'" id="f-thumb" src="'+esc(draft.photo_url||"")+'" alt="">'
+    + '<input type="file" id="f-file" accept="image/*" style="font-size:13px"></div>'
+    + '<div class="field"><label>Your scores</label>'
+    + CATS.map(c => '<div class="cat"><label>'+c+'<span class="hint">'+HINT[c]+'</span></label>'
+      + '<div class="scale" data-c="'+c+'">'
+      + Array.from({length:10}, (_,i) => '<button data-v="'+(i+1)+'" aria-pressed="'
+        + (draft.scores[c]===i+1)+'" style="'+(draft.scores[c]===i+1?"background:"+colour(idx(ME)):"")+'">'
+        + (i+1)+'</button>').join("")
+      + '</div></div>').join("")
+    + '</div>'
+    + '<div class="row"><button class="btn ghost" id="f-cancel">Cancel</button>'
+    + '<button class="btn" id="f-save">Save</button></div>'
+    + (e ? '<div class="row"><button class="btn danger" id="f-del">Delete this place</button></div>' : "")
+    + '<div class="note" id="f-note"></div>';
+
+  $("f-tier").querySelectorAll("button").forEach(b => b.onclick = () => {
+    draft.tier = b.dataset.t;
+    $("f-tier").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  });
+
+  $("sheet-in").querySelectorAll(".scale").forEach(row => {
+    row.querySelectorAll("button").forEach(b => b.onclick = () => {
+      const c = row.dataset.c, v = Number(b.dataset.v);
+      draft.scores[c] = draft.scores[c] === v ? null : v;
+      row.querySelectorAll("button").forEach(x => {
+        const on = Number(x.dataset.v) === draft.scores[c];
+        x.setAttribute("aria-pressed", String(on));
+        x.style.background = on ? colour(idx(ME)) : "";
+      });
+    });
+  });
+
+  $("f-file").onchange = () => {
+    const file = $("f-file").files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      draft.dataUrl = reader.result;
+      $("f-thumb").src = reader.result;
+      $("f-thumb").classList.add("show");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  $("f-cancel").onclick = closeSheet;
+  if (e) $("f-del").onclick = async () => {
+    if (!confirm("Delete " + e.name + " and both your ratings?")) return;
+    await api("delete", {id: e.id});
+    DATA = await api("list");
+    closeSheet(); render();
+  };
+
+  $("f-save").onclick = async () => {
+    const note = $("f-note");
+    note.textContent = "";
+    const name = $("f-name").value.trim();
+    if (!name) { note.textContent = "Give it a name."; return; }
+
+    $("f-save").textContent = "Saving";
+    try {
+      let id = e?.id;
+      const date = $("f-date").value || null;
+      if (id) await api("update", {id, name, tier: draft.tier, visited_on: date});
+      else id = (await api("add", {name, tier: draft.tier, visited_on: date})).id;
+
+      if (draft.dataUrl) await api("photo", {id, dataUrl: draft.dataUrl});
+
+      const given = CATS.filter(c => draft.scores[c] !== null);
+      if (given.length) await api("rate", {id, personId: ME, ...draft.scores});
+
+      DATA = await api("list");
+      closeSheet();
+      render();
+    } catch (err) {
+      note.textContent = err.message;
+      $("f-save").textContent = "Save";
+    }
+  };
+
+  $("sheet").classList.add("open");
+  $("scrim").classList.add("open");
+  $("sheet").scrollTop = 0;
+}
+
+/* ---------------- boot ---------------- */
+
+(async () => {
+  if (!PW) return;
+  try {
+    DATA = await api("list");
+    ME && DATA.people.some(p => p.id === ME) ? start() : showWho();
+  } catch {
+    localStorage.removeItem("makan.pw");
+  }
+})();
+</script>
+</body>
+</html>
