@@ -152,18 +152,41 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .stats b{font-weight:500;color:var(--ink)}
 .stats span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .stats i{flex:none;margin-left:auto;font-style:normal;color:var(--rule)}
-.stat-block{margin-bottom:26px}
-.stat-h{font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
-  color:var(--muted);margin:0 0 8px}
-.stat-big{font-family:var(--serif);font-size:26px;line-height:1.2;margin:0}
-.stat-sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin:5px 0 0}
-.bars{display:grid;gap:7px;margin-top:4px}
-.bar-row{display:grid;grid-template-columns:5.5em minmax(0,1fr) 3em;gap:8px;align-items:center;
-  font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+
+/* ---- stats panel ---- */
+.s-hero{padding:6px 0 26px;border-bottom:1px solid var(--rule)}
+.s-num{font-family:var(--serif);font-size:76px;line-height:.86;letter-spacing:-.03em;margin:0}
+.s-num small{font-size:26px;letter-spacing:0;color:var(--muted)}
+.s-said{font-family:var(--serif);font-size:23px;line-height:1.25;margin:12px 0 0}
+.s-said em{font-style:normal}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:30px 0 14px;display:flex;align-items:baseline;gap:8px}
+.eyebrow:after{content:"";flex:1;height:1px;background:var(--rule)}
+
+/* One row of the paired comparison: label, the two-dot track, both numbers. */
+.pair{display:grid;grid-template-columns:4.6em minmax(0,1fr) auto;gap:10px;align-items:center;
+  padding:9px 0}
+.pair-l{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;
   color:var(--muted)}
-.bar-track{height:6px;background:var(--sink);border-radius:3px;overflow:hidden}
-.bar-fill{height:100%;border-radius:3px}
-.bar-row b{font-weight:500;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+.pair-v{font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums;
+  display:flex;gap:7px}
+.s-track{position:relative;height:13px}
+.s-axis{position:absolute;top:6px;left:0;right:0;height:1px;background:var(--rule)}
+.s-span{position:absolute;top:5.5px;height:2px;background:var(--ink);opacity:.25;border-radius:2px}
+.s-span.wide{background:var(--spark);opacity:.7}
+.s-dot{position:absolute;top:3px;width:8px;height:8px;border-radius:50%;margin-left:-4px}
+.s-scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;
+  color:var(--rule);margin-top:2px}
+
+.card{border-top:1px solid var(--rule);padding:15px 0}
+.card-k{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted)}
+.card-n{font-family:var(--serif);font-size:25px;line-height:1.2;margin:4px 0 0;
+  overflow-wrap:anywhere}
+.card-v{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px}
+.card-v b{color:var(--spark);font-weight:500}
+.s-foot{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);border-top:1px solid var(--rule);padding-top:14px;margin-top:26px}
 .section{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
   color:var(--muted);margin:26px 0 2px;padding-top:12px;border-top:1px solid var(--rule)}
 .empty{font-family:var(--serif);font-size:22px;color:var(--muted);text-align:center;padding:60px 10px}
@@ -651,45 +674,69 @@ function openStats() {
   const st = computeStats();
   if (!st) return;
 
-  const bar = (label, val, max, col) =>
-    '<div class="bar-row"><span>' + label + '</span>'
-    + '<span class="bar-track"><span class="bar-fill" style="width:'
-    + Math.max(3, (val / max) * 100) + '%;background:' + col + '"></span></span>'
-    + '<b>' + val.toFixed(2) + '</b></div>';
+  const p1 = st.per[0], p2 = st.per[1];
+  const short = p => esc(p.name.trim().split(/\s+/)[0]);
+  const at = v => ((v - 1) / 9) * 100;
+
+  // The same two-dot track used on every list row, so the whole app reads the
+  // same way: distance between the dots is the disagreement.
+  const track = (a, b, flag) => {
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    return '<div class="s-track"><div class="s-axis"></div>'
+      + '<div class="s-span' + (flag ? ' wide' : '') + '" style="left:' + at(lo)
+      + '%;width:' + (at(hi) - at(lo)) + '%"></div>'
+      + '<i class="s-dot" style="left:' + at(a) + '%;background:' + colour(idx(p1.id)) + '"></i>'
+      + '<i class="s-dot" style="left:' + at(b) + '%;background:' + colour(idx(p2.id)) + '"></i>'
+      + '</div>';
+  };
+
+  const pair = (label, a, b) =>
+    '<div class="pair"><span class="pair-l">' + label + '</span>'
+    + track(a, b, Math.abs(a - b) >= 1.5)
+    + '<span class="pair-v">'
+    +   '<span style="color:' + colour(idx(p1.id)) + '">' + a.toFixed(1) + '</span>'
+    +   '<span style="color:' + colour(idx(p2.id)) + '">' + b.toFixed(1) + '</span>'
+    + '</span></div>';
 
   let body = '<div class="step">';
 
-  body += '<div class="stat-block"><p class="stat-h">Who scores higher</p>'
-    + '<p class="stat-big">' + (st.spread >= 0.15
-        ? esc(st.generous.name) + ' by ' + st.spread.toFixed(2)
-        : 'Neck and neck')
-    + '</p><p class="stat-sub">Average weighted score across all '
-    + st.count + ' places</p><div class="bars">'
-    + st.per.map((p, i) => bar(p.name.split(/\s+/)[0], p.avg, 10, colour(idx(p.id)))).join("")
-    + '</div></div>';
+  // Hero: the one number worth leading with.
+  body += '<div class="s-hero">'
+    + '<p class="s-num">' + (st.spread >= 0.05 ? "+" : "") + st.spread.toFixed(2)
+    + '<small> / 10</small></p>'
+    + '<p class="s-said">' + (st.spread >= 0.15
+        ? '<em style="color:' + colour(idx(st.generous.id)) + '">' + esc(st.generous.name) + '</em>'
+          + ' is the softer marker.'
+        : 'You mark almost identically.')
+    + '</p></div>';
 
-  body += '<div class="stat-block"><p class="stat-h">What each of you weighs</p>'
-    + '<p class="stat-sub" style="margin:0 0 10px">Your average out of 10 per category</p>'
-    + CATS.map(c =>
-        '<div style="margin-bottom:11px"><div class="bars">'
-        + st.per.map(p => bar(c === CATS[0] ? p.name.split(/\s+/)[0] : p.name.split(/\s+/)[0],
-            p.cats[c], 10, colour(idx(p.id)))).join("")
-        + '</div><p class="stat-sub" style="margin-top:4px">' + c + '</p></div>').join("")
-    + '</div>';
+  body += '<p class="eyebrow">Overall average</p>'
+    + pair("Overall", p1.avg, p2.avg)
+    + '<div class="s-scale"><span>1</span><span>10</span></div>';
 
-  body += '<div class="stat-block"><p class="stat-h">Biggest disagreement</p>'
-    + '<p class="stat-big">' + esc(st.widest.name) + '</p>'
-    + '<p class="stat-sub">' + st.widest.gap.toFixed(2) + ' apart \u00b7 '
-    + st.splits + ' of ' + st.count + ' places split by 1.5 or more</p></div>';
+  body += '<p class="eyebrow">Category by category</p>'
+    + CATS.map(c => pair(c, p1.cats[c], p2.cats[c])).join("")
+    + '<div class="s-scale"><span>1</span><span>10</span></div>';
 
-  body += '<div class="stat-block"><p class="stat-h">Most agreed on</p>'
-    + '<p class="stat-big">' + esc(st.closest.name) + '</p>'
-    + '<p class="stat-sub">' + st.closest.gap.toFixed(2) + ' apart</p></div>';
+  body += '<p class="eyebrow">Where you split</p>'
+    + '<div class="card"><span class="card-k">Furthest apart</span>'
+    + '<p class="card-n">' + esc(st.widest.name) + '</p>'
+    + '<p class="card-v"><b>' + st.widest.gap.toFixed(2) + '</b> apart</p></div>'
+    + '<div class="card"><span class="card-k">Closest</span>'
+    + '<p class="card-n">' + esc(st.closest.name) + '</p>'
+    + '<p class="card-v">' + st.closest.gap.toFixed(2) + ' apart</p></div>';
 
-  const maxTier = Math.max(...st.tiers.map(t => t.avg), 1);
-  body += '<div class="stat-block"><p class="stat-h">Average by tier</p><div class="bars">'
-    + st.tiers.map(t => bar(TIER_LABEL[t.tier], t.avg, maxTier, "var(--brass)")).join("")
-    + '</div><p class="stat-sub">Overall average ' + st.avg.toFixed(2) + '</p></div>';
+  body += '<p class="eyebrow">By tier</p>'
+    + st.tiers.map(t => {
+        const inT = DATA.entries.filter(e => e.tier === t.tier);
+        const a = inT.reduce((x, e) => x + (e.scores.find(s => s.personId === p1.id)?.total ?? 0), 0) / t.n;
+        const b = inT.reduce((x, e) => x + (e.scores.find(s => s.personId === p2.id)?.total ?? 0), 0) / t.n;
+        return pair(TIER_LABEL[t.tier].split(" ")[0], a, b);
+      }).join("")
+    + '<div class="s-scale"><span>1</span><span>10</span></div>';
+
+  body += '<p class="s-foot">' + st.count + ' places \u00b7 average '
+    + st.avg.toFixed(2) + ' \u00b7 ' + st.splits + ' split by 1.5+</p>';
 
   body += '</div>';
 
