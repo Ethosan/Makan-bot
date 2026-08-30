@@ -72,26 +72,34 @@ function localDate(daysAgo = 0): string {
   return new Date(t).toISOString().slice(0, 10);
 }
 
-const HELP = `${TIER_EMOJI.fancy} <b>Restaurant list</b>
+const HELP = `${TIER_EMOJI.fancy} <b>The List</b>
 
-<b>/add</b> — walk through adding a place, tap by tap. This is the main one.
-<b>/rate <i>name</i></b> — bring back a place's rating card
-<b>/list</b> — everything, with ids
-<b>/todo</b> — what's still waiting on you
-<b>/board</b> — print the leaderboard
-<b>/site</b> — link to the web version, with photos
+Most of the time you'll want the app \u2014 <b>/site</b> opens it, and everything below can be done there too.
 
-<i>Want to eat:</i>
-<b>/want <i>name</i></b> — add one. Reply to a post with it to keep the link.
-<b>/wants</b> — the whole want list
-<b>/random</b> — pick one for us. <code>/random cheap</code> to narrow it.
-<b>/setboard</b> — post &amp; pin the auto-updating board here
-<b>/when <i>name</i> 2025-12-02</b> — set a date you skipped
-<b>photo</b> — reply to a card with one, or caption it <code>/photo <i>name</i></code>. Only one of you needs to.
-<b>/weights</b> — how each tier is scored
-<b>/remove <i>name</i></b> — delete an entry
+<b><u>Places you've been</u></b>
+<b>/add</b> \u2014 the wizard: name, tier, date, photo, then scores
+<b>/rate <i>name</i></b> \u2014 reopen a place's rating card
+<b>/todo</b> \u2014 what's still waiting on you
+<b>/list</b> \u2014 everything, with ids
+<b>/board</b> \u2014 print the leaderboard
+<b>/when <i>name</i> 2025-12-02</b> \u2014 set a date you skipped
+<b>/remove <i>name</i></b> \u2014 delete an entry
 
-<i>Faster, if you're backfilling a batch:</i>
+<b><u>Places you want to go</u></b>
+<b>/want <i>name</i></b> \u2014 add one. <code>/want Kok Sen | cheap</code> to tag the tier, or reply to a post with it to keep the link.
+<b>/wants</b> \u2014 the whole want list
+<b>/random</b> \u2014 pick one for us. <code>/random cheap</code> to narrow it.
+
+<b><u>Photos</u></b>
+Reply to any card with a photo, or send one captioned <code>/photo <i>name</i></code>. Only one of you needs to.
+<b>/unphoto <i>name</i></b> \u2014 take it off again
+
+<b><u>Setup</u></b>
+<b>/site</b> \u2014 open the app
+<b>/setboard</b> \u2014 post &amp; pin the auto-updating board in this topic
+<b>/weights</b> \u2014 how each tier is scored
+
+<b><u>Backfilling a batch</u></b>
 <code>/quickadd Odette | fancy | 2025-12-02</code>
 <code>/bulk</code> then one place per line`;
 
