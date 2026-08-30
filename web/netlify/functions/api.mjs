@@ -243,6 +243,36 @@ export default async (request) => {
         return json({ id: data.id });
       }
 
+      case "wantBulk": {
+        // Accepts a pasted list: bullets, numbering, "| tier", (notes).
+        const lines = String(body.text ?? "").split("\n");
+        const parsed = [];
+        for (const line of lines) {
+          let t = line.replace(/^\s*[-*\u2022\u2013\u2014]\s*/, "").replace(/^\s*\d+[.)]\s*/, "").trim();
+          if (!t) continue;
+          let tier = null;
+          if (t.includes("|")) {
+            const parts = t.split("|");
+            const last = parts[parts.length - 1].trim().toLowerCase();
+            if (TIERS.includes(last)) { tier = last; parts.pop(); t = parts.join("|").trim(); }
+          }
+          let note = null;
+          const paren = t.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+          if (paren && paren[1].trim()) { t = paren[1].trim(); note = paren[2].trim() || null; }
+          if (t) parsed.push({ chat_id: chatId(), name: t, tier, note });
+        }
+        if (!parsed.length) return json({ error: "Nothing to add there" }, 400);
+
+        let added = 0;
+        const skipped = [];
+        for (const row of parsed) {
+          const { error } = await db.from("wishlist").insert(row);
+          if (error) skipped.push(row.name);
+          else added++;
+        }
+        return json({ added, skipped });
+      }
+
       case "wantUpdate": {
         const patch = {};
         if (body.name !== undefined) patch.name = String(body.name).trim();
