@@ -26,11 +26,14 @@ import {
   type Restaurant,
 } from "./db";
 import { escapeHtml, refreshBoard, renderBoard, revealText } from "./leaderboard";
+import { combinedScore, fmt } from "./scoring";
 import { mirrorToStorage } from "./photos";
 import {
   addWant,
   dropWant,
+  parseWantLine,
   pick,
+  pickWeighted,
   rollKeyboard,
   rollText,
   wantById,
@@ -86,9 +89,10 @@ Most of the time you'll want the app \u2014 <b>/site</b> opens it, and everythin
 <b>/remove <i>name</i></b> \u2014 delete an entry
 
 <b><u>Places you want to go</u></b>
-<b>/want <i>name</i></b> \u2014 add one. <code>/want Kok Sen | cheap</code> to tag the tier, or reply to a post with it to keep the link.
+<b>/want <i>name</i></b> \u2014 add one, or paste a whole list under the command, one per line. <code>| cheap</code> on the end tags the tier; anything in (brackets) becomes a note.
 <b>/wants</b> \u2014 the whole want list
-<b>/random</b> \u2014 pick one for us. <code>/random cheap</code> to narrow it.
+<b>/random</b> \u2014 pick somewhere new. <code>/random cheap</code> to narrow it.
+<b>/again</b> \u2014 pick somewhere you've been, weighted towards what you rated highly. <code>/again fancy</code> to narrow it.
 
 <b><u>Photos</u></b>
 Reply to any card with a photo, or send one captioned <code>/photo <i>name</i></code>. Only one of you needs to.
@@ -598,25 +602,41 @@ export function createBot(env: Env): Bot {
       );
     }
 
-    const [name, rawTier, ...rest] = args.split("|").map((x) => x.trim());
-    const tier = rawTier ? parseTier(rawTier) : null;
-    if (rawTier && !tier) return reply(ctx, "Tier should be cheap, normal or fancy.");
+    // One line or twenty — paste a whole list and every line becomes an entry.
+    const parsed = args.split("\n").map(parseWantLine).filter(Boolean) as {
+      name: string;
+      tier: Tier | null;
+      note: string | null;
+    }[];
+    if (!parsed.length) return reply(ctx, "Nothing to add there.");
 
-    const { want, error } = await addWant(sb, {
-      chat_id: ctx.chat.id,
-      name,
-      tier,
-      note: rest.join(" | ") || null,
-      source_message_id: replied?.message_id ?? null,
-      added_by: ctx.from?.id ?? null,
-    });
-    if (error || !want) return reply(ctx, `Couldn't add it \u2014 ${escapeHtml(error ?? "?")}.`);
+    const added: string[] = [];
+    const skipped: string[] = [];
+    for (const item of parsed) {
+      const { want, error } = await addWant(sb, {
+        chat_id: ctx.chat.id,
+        name: item.name,
+        tier: item.tier,
+        note: item.note,
+        source_message_id: replied?.message_id ?? null,
+        added_by: ctx.from?.id ?? null,
+      });
+      if (error || !want) skipped.push(`${item.name} \u2014 ${error}`);
+      else added.push(want.name);
+    }
 
-    return reply(
-      ctx,
-      `Added <b>${escapeHtml(want.name)}</b> to the want list` +
-        (tier ? ` as <i>${TIER_LABEL[tier]}</i>.` : ". <i>Tag the tier later if you like.</i>")
-    );
+    if (parsed.length === 1 && added.length === 1) {
+      return reply(
+        ctx,
+        `Added <b>${escapeHtml(added[0])}</b> to the want list` +
+          (parsed[0].tier ? ` as <i>${TIER_LABEL[parsed[0].tier!]}</i>.` : ". <i>Tag the tier later if you like.</i>")
+      );
+    }
+
+    const out = [`Added <b>${added.length}</b> to the want list.`];
+    if (skipped.length) out.push("", `Skipped ${skipped.length}:`, ...skipped.map(escapeHtml));
+    out.push("", "<code>/wants</code> to see them, <code>/random</code> to pick one.");
+    return reply(ctx, out.join("\n"));
   });
 
   bot.command(["wants", "wishlist"], async (ctx) =>
@@ -647,6 +667,72 @@ export function createBot(env: Env): Bot {
       reply_markup: rollKeyboard(chosen, tier),
     });
   }
+
+  // The other roll: somewhere you've already been and liked.
+  bot.command(["again", "revisit"], async (ctx) => {
+    const raw = (ctx.match as string)?.trim();
+    const tier = raw ? parseTier(raw) : null;
+    if (raw && !tier) return reply(ctx, "Try <code>/again</code>, or <code>/again fancy</code>.");
+    return rollAgain(ctx, tier);
+  });
+
+  async function rollAgain(ctx: Context, tier: Tier | null) {
+    const rows = await allWithRatings(sb, ctx.chat!.id);
+    const names = await peopleMap(sb);
+    const needed = Math.max(2, names.size);
+    const pool = rows
+      .filter((r) => r.complete.length >= needed && (!tier || r.tier === tier))
+      .map((r) => ({ row: r, score: combinedScore(r.complete, r.tier) }));
+
+    const chosen = pickWeighted(pool, (p) => p.score);
+    if (!chosen) {
+      return reply(
+        ctx,
+        tier
+          ? `Nothing fully rated in <i>${TIER_LABEL[tier]}</i> yet.`
+          : "Nothing fully rated yet."
+      );
+    }
+
+    const { row, score } = chosen;
+    return ctx.reply(
+      [
+        `\u{1F501} <b>${escapeHtml(row.name)}</b>`,
+        `<i>${TIER_LABEL[row.tier]}</i> \u00b7 you gave it <b>${fmt(score)}</b>`,
+        "",
+        "<i>weighted towards the ones you rated highly</i>",
+      ].join("\n"),
+      {
+        parse_mode: "HTML",
+        message_thread_id: ctx.message?.message_thread_id,
+        reply_markup: new InlineKeyboard().text("\u{1F3B2} Again", `g:${tier ?? "any"}`),
+      }
+    );
+  }
+
+  bot.callbackQuery(/^g:(cheap|normal|fancy|any)$/, async (ctx) => {
+    const raw = ctx.match![1];
+    const tier = raw === "any" ? null : (raw as Tier);
+    const rows = await allWithRatings(sb, ctx.chat!.id);
+    const names = await peopleMap(sb);
+    const needed = Math.max(2, names.size);
+    const pool = rows
+      .filter((r) => r.complete.length >= needed && (!tier || r.tier === tier))
+      .map((r) => ({ row: r, score: combinedScore(r.complete, r.tier) }));
+    const chosen = pickWeighted(pool, (p) => p.score);
+    if (!chosen) return ctx.answerCallbackQuery({ text: "Nothing to pick from." });
+
+    await ctx.editMessageText(
+      [
+        `\u{1F501} <b>${escapeHtml(chosen.row.name)}</b>`,
+        `<i>${TIER_LABEL[chosen.row.tier]}</i> \u00b7 you gave it <b>${fmt(chosen.score)}</b>`,
+        "",
+        "<i>weighted towards the ones you rated highly</i>",
+      ].join("\n"),
+      { parse_mode: "HTML", reply_markup: new InlineKeyboard().text("\u{1F3B2} Again", `g:${raw}`) }
+    );
+    return ctx.answerCallbackQuery();
+  });
 
   bot.callbackQuery(/^w:roll:(cheap|normal|fancy|any)$/, async (ctx) => {
     const raw = ctx.match![1];
