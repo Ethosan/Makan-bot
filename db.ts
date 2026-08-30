@@ -8,6 +8,7 @@ export interface Restaurant {
   tier: Tier;
   visited_on: string | null;
   photo_file_id: string | null;
+  photo_url: string | null;
   card_message_id: number | null;
 }
 
@@ -26,9 +27,14 @@ export interface Draft {
 
 export interface Env {
   BOT_TOKEN: string;
+  SITE_TOKEN?: string;
   WEBHOOK_SECRET: string;
   SUPABASE_URL: string;
   SUPABASE_SERVICE_KEY: string;
+  /** Optional. Shown by /site so you can pin the link in the group. */
+  SITE_URL?: string;
+  /** Optional. If set, the site and its photos require ?k=<this value>. */
+  SITE_KEY?: string;
 }
 
 export function db(env: Env): SupabaseClient {
@@ -161,8 +167,72 @@ export async function setCardMessage(sb: SupabaseClient, id: number, messageId: 
   await sb.from("restaurants").update({ card_message_id: messageId }).eq("id", id);
 }
 
-export async function setPhoto(sb: SupabaseClient, id: number, fileId: string | null) {
-  await sb.from("restaurants").update({ photo_file_id: fileId }).eq("id", id);
+export async function setPhoto(
+  sb: SupabaseClient,
+  id: number,
+  fileId: string | null,
+  url?: string | null
+) {
+  await sb.from("restaurants").update({ photo_file_id: fileId, photo_url: url ?? null }).eq("id", id);
+}
+
+/**
+ * Telegram file ids only resolve inside Telegram, so the web view needs a real
+ * URL. Pull the bytes down once and park them in Supabase Storage.
+ */
+export async function mirrorPhoto(
+  sb: SupabaseClient,
+  botToken: string,
+  restaurantId: number,
+  fileId: string
+): Promise<string | null> {
+  try {
+    const metaRes = await fetch(
+      `https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`
+    );
+    const meta = (await metaRes.json()) as any;
+    const path = meta?.result?.file_path;
+    if (!path) return null;
+
+    const fileRes = await fetch(`https://api.telegram.org/file/bot${botToken}/${path}`);
+    if (!fileRes.ok) return null;
+    const bytes = await fileRes.arrayBuffer();
+
+    const ext = path.split(".").pop()?.toLowerCase() || "jpg";
+    const key = `${restaurantId}-${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from("photos").upload(key, bytes, {
+      contentType: fileRes.headers.get("content-type") ?? "image/jpeg",
+      upsert: true,
+    });
+    if (error) return null;
+
+    return sb.storage.from("photos").getPublicUrl(key).data.publicUrl;
+  } catch {
+    return null;
+  }
+}
+
+/** Everything, for the web view. */
+export async function allForSite(sb: SupabaseClient): Promise<ScoredRow[]> {
+  const { data } = await sb
+    .from("restaurants")
+    .select(
+      "id, name, tier, visited_on, photo_url, ratings(telegram_id, food, ambiance, aesthetics, service)"
+    )
+    .order("created_at", { ascending: false });
+
+  return (data ?? []).map((r: any) => {
+    const ratings = normalise(r.ratings ?? []);
+    return {
+      id: Number(r.id),
+      name: r.name as string,
+      tier: r.tier as Tier,
+      visited_on: r.visited_on as string | null,
+      photo_url: (r.photo_url as string | null) ?? null,
+      ratings,
+      complete: ratings.filter(isComplete),
+    };
+  });
 }
 
 /** Finds the place whose rating card a user just replied to. */
@@ -268,6 +338,7 @@ export interface ScoredRow {
   name: string;
   tier: Tier;
   visited_on: string | null;
+  photo_url?: string | null;
   ratings: PartialRating[];
   complete: Rating[];
 }
