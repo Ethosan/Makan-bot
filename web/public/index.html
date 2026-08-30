@@ -45,6 +45,9 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   display:grid;grid-template-rows:auto minmax(0,1fr) auto}
 .scroll{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;padding:0 var(--pad)}
+/* A few px of slack so nothing can ever touch the edge, even if a font
+   measures slightly wider than expected. */
+#board{padding-right:calc(var(--pad) + 6px)}
 .bar{padding:12px var(--pad) calc(14px + var(--tg-bottom));
   border-top:1px solid var(--rule);background:var(--paper);display:flex;gap:9px}
 
@@ -81,7 +84,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   white-space:nowrap}
 /* Own line, wrapping. A title-and-names row is the one pair guaranteed to be
    too wide on a narrow phone. */
-.build{margin-left:auto;color:var(--rule);letter-spacing:.1em}
+.build{margin-left:auto;color:var(--rule);letter-spacing:.1em;
+  background:none;border:0;font:inherit;padding:2px 6px}
 .key{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10px;
   letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:6px}
 .who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -114,7 +118,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .r-rank.plain{color:var(--rule)}
 .r-name{flex:1 1 auto;min-width:0;font-family:var(--serif);font-size:20px;line-height:1.2;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.r-score{flex:none;margin-left:auto;font-family:var(--mono);font-size:17px;
+.r-score{flex:none;margin-left:auto;padding-left:4px;font-family:var(--mono);font-size:16px;
   font-variant-numeric:tabular-nums;white-space:nowrap}
 .r-thumb{width:56px;height:56px;border-radius:3px;background:var(--sink);object-fit:cover;
   display:block}
@@ -342,6 +346,25 @@ function pinWidth() {
   if (location.search.includes("debug")) showDebug(w);
 }
 
+/**
+ * Walks the DOM and reports anything sticking out past the right edge. Beats
+ * guessing when there's no dev tools on a phone.
+ */
+function findOverflow() {
+  const limit = document.documentElement.clientWidth;
+  const bad = [];
+  document.querySelectorAll("#app *, .panel *").forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (r.width && r.right > limit + 0.5) {
+      const id = el.id ? "#" + el.id : "";
+      const cls = typeof el.className === "string" && el.className
+        ? "." + el.className.trim().split(/\s+/)[0] : "";
+      bad.push((el.tagName.toLowerCase() + id + cls) + "@" + Math.round(r.right));
+    }
+  });
+  return [...new Set(bad)].slice(0, 8);
+}
+
 function showDebug(w) {
   let el = document.getElementById("dbg");
   if (!el) { el = document.createElement("div"); el.id = "dbg"; document.body.appendChild(el); }
@@ -353,7 +376,8 @@ function showDebug(w) {
     "\npinned " + w + "  body " + Math.round(b.width) +
     "  scrollW " + document.documentElement.scrollWidth +
     "  dpr " + window.devicePixelRatio +
-    "\ninTelegram " + Boolean(window.Telegram?.WebApp?.initData);
+    "\ninTelegram " + Boolean(window.Telegram?.WebApp?.initData) +
+    "\nover: " + (findOverflow().join("  ") || "nothing past the edge");
 }
 
 pinWidth();
@@ -533,7 +557,7 @@ function render() {
   $("add").onclick = () => openForm(null);
 }
 
-const BUILD = "b8";
+const BUILD = "b9";
 
 function renderKey() {
   // First name only: full names blow the header wider than the screen.
@@ -542,7 +566,13 @@ function renderKey() {
     + '<i class="swatch" style="background:'+colour(i)+'"></i>'
     + esc(p.name.trim().split(/\s+/)[0])
     + '<span class="sr"> '+esc(p.name)+(p.id===ME?" (you)":"")+'</span></span>').join("")
-    + '<span class="build" aria-hidden="true">'+BUILD+'</span>';
+    + '<button class="build" id="build" title="Tap for layout info">'+BUILD+'</button>';
+  $("build").onclick = () => {
+    const on = !document.getElementById("dbg");
+    if (on) showDebug(parseInt(getComputedStyle(document.documentElement)
+      .getPropertyValue("--app-w")) || window.innerWidth);
+    else document.getElementById("dbg").remove();
+  };
 }
 
 function renderNav() {
