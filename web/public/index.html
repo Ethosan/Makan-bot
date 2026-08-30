@@ -517,7 +517,10 @@ function render() {
   $("board").querySelectorAll("[data-open]").forEach(b =>
     b.onclick = () => openDetail(Number(b.dataset.open)));
 
-  $("app").querySelector(".bar").innerHTML = '<button class="btn" id="add">+ Add a place</button>';
+  $("app").querySelector(".bar").innerHTML =
+    '<button class="btn ghost" id="roll">\u{1F501} Pick</button>'
+    + '<button class="btn" id="add">+ Add a place</button>';
+  $("roll").onclick = rollAgain;
   $("add").onclick = () => openForm(null);
 }
 
@@ -574,7 +577,35 @@ function renderWant() {
   $("add").onclick = () => openWantForm(null);
 }
 
-/** Rolls from the current tier filter, or from everything if none is set. */
+/**
+ * Revisit roll. Weighted by score, because uniform random keeps offering the
+ * one you both rated 6.5 — not what "where should we go" means. Squaring the
+ * distance above 4 makes an 8.9 about three times likelier than a 6.9.
+ */
+function rollAgain() {
+  const pool = DATA.entries.filter(e => filter === "all" || e.tier === filter);
+  if (!pool.length) { alert("Nothing fully rated in that tier yet."); return; }
+
+  const weights = pool.map(e => Math.pow(Math.max(0.1, e.combined - 4), 2));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total, e = pool[pool.length - 1];
+  for (let i = 0; i < pool.length; i++) { r -= weights[i]; if (r <= 0) { e = pool[i]; break; } }
+
+  panelClose();
+  panelOpen("Go back to",
+    '<div class="step" style="text-align:center">'
+    + (e.photo_url ? '<img class="hero" src="'+esc(e.photo_url)+'" alt="">' : '')
+    + '<h3 class="q" style="font-size:36px;margin-top:20px">'+esc(e.name)+'</h3>'
+    + '<p class="q-hint">'+TIER_LABEL[e.tier]+' \u00b7 you gave it '+e.combined.toFixed(2)+'</p>'
+    + '<p class="d-sub" style="margin-top:26px">weighted towards what you rated highly</p></div>',
+    '<button class="btn ghost" id="a-again">\u{1F3B2} Again</button>'
+    + '<button class="btn" id="a-open">See the scores</button>');
+  $("p-back").dataset.act = "close";
+  $("a-again").onclick = rollAgain;
+  $("a-open").onclick = () => openDetail(e.id);
+}
+
+/** Rolls from the want list \u2014 somewhere new. Uniform, since none are rated. */
 function rollOne(tier = null) {
   const pool = (DATA.wishlist ?? []).filter(w => !tier || w.tier === tier);
   if (!pool.length) { alert("Nothing to pick from in that tier."); return; }
