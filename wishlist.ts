@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { InlineKeyboard } from "grammy";
-import { TIERS, TIER_EMOJI, TIER_LABEL, type Tier } from "./scoring";
+import { TIERS, TIER_EMOJI, TIER_LABEL, parseTier, type Tier } from "./scoring";
 import { escapeHtml } from "./leaderboard";
 
 export interface Want {
@@ -92,4 +92,55 @@ export function rollKeyboard(w: Want, tier: Tier | null): InlineKeyboard {
     .text("\u2705 We went", `w:went:${w.id}`)
     .row()
     .text("\u2715 Take it off the list", `w:drop:${w.id}`);
+}
+
+/**
+ * Parses one line of a pasted list. Handles the shapes people actually paste:
+ * bullets, numbering, a trailing "| tier", and a parenthetical aside that
+ * becomes the note.
+ *
+ *   "- LES AMIS (when we rich rich)"  ->  LES AMIS, note "when we rich rich"
+ *   "3. Odette | fancy"               ->  Odette, tier fancy
+ */
+export function parseWantLine(line: string): { name: string; tier: Tier | null; note: string | null } | null {
+  let s = line.replace(/^\s*[-*\u2022\u2013\u2014]\s*/, "").replace(/^\s*\d+[.)]\s*/, "").trim();
+  if (!s) return null;
+
+  let tier: Tier | null = null;
+  if (s.includes("|")) {
+    const parts = s.split("|");
+    const maybe = parseTier(parts[parts.length - 1]);
+    if (maybe) {
+      tier = maybe;
+      parts.pop();
+      s = parts.join("|").trim();
+    }
+  }
+
+  let note: string | null = null;
+  const paren = s.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+  if (paren && paren[1].trim()) {
+    s = paren[1].trim();
+    note = paren[2].trim() || null;
+  }
+
+  return s ? { name: s, tier, note } : null;
+}
+
+/**
+ * Weighted pick for revisits. Uniform random keeps offering the place you
+ * both scored 6.5, which isn't what "where should we go" means. Squaring the
+ * distance above 4 makes a 8.9 roughly three times likelier than a 6.9,
+ * without ever ruling the low ones out.
+ */
+export function pickWeighted<T>(items: T[], scoreOf: (t: T) => number): T | null {
+  if (!items.length) return null;
+  const weights = items.map((it) => Math.pow(Math.max(0.1, scoreOf(it) - 4), 2));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < items.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return items[i];
+  }
+  return items[items.length - 1];
 }
