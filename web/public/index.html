@@ -84,8 +84,6 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   white-space:nowrap}
 /* Own line, wrapping. A title-and-names row is the one pair guaranteed to be
    too wide on a narrow phone. */
-.build{margin-left:auto;color:var(--rule);letter-spacing:.1em;
-  background:none;border:0;font:inherit;padding:2px 6px}
 .key{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10px;
   letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:6px}
 .who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -224,8 +222,6 @@ fieldset{border:0;padding:0;margin:0}
 .drop.has span{display:none}
 .status{font-family:var(--mono);font-size:12px;margin-top:14px;min-height:18px;color:var(--spark)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-#dbg{position:fixed;left:0;right:0;bottom:0;z-index:99;background:#191E19;color:#F1F3EB;
-  font-family:var(--mono);font-size:10px;padding:6px 8px;line-height:1.5;white-space:pre-wrap}
 </style>
 </head>
 <body>
@@ -343,41 +339,6 @@ function pinWidth() {
   if (!cands.length) return;
   const w = Math.floor(Math.min(...cands));
   document.documentElement.style.setProperty("--app-w", w + "px");
-  if (location.search.includes("debug")) showDebug(w);
-}
-
-/**
- * Walks the DOM and reports anything sticking out past the right edge. Beats
- * guessing when there's no dev tools on a phone.
- */
-function findOverflow() {
-  const limit = document.documentElement.clientWidth;
-  const bad = [];
-  document.querySelectorAll("#app *, .panel *").forEach(el => {
-    const r = el.getBoundingClientRect();
-    if (r.width && r.right > limit + 0.5) {
-      const id = el.id ? "#" + el.id : "";
-      const cls = typeof el.className === "string" && el.className
-        ? "." + el.className.trim().split(/\s+/)[0] : "";
-      bad.push((el.tagName.toLowerCase() + id + cls) + "@" + Math.round(r.right));
-    }
-  });
-  return [...new Set(bad)].slice(0, 8);
-}
-
-function showDebug(w) {
-  let el = document.getElementById("dbg");
-  if (!el) { el = document.createElement("div"); el.id = "dbg"; document.body.appendChild(el); }
-  const b = document.body.getBoundingClientRect();
-  el.textContent =
-    "clientWidth " + document.documentElement.clientWidth +
-    "  innerWidth " + window.innerWidth +
-    "  visual " + Math.round(window.visualViewport?.width ?? 0) +
-    "\npinned " + w + "  body " + Math.round(b.width) +
-    "  scrollW " + document.documentElement.scrollWidth +
-    "  dpr " + window.devicePixelRatio +
-    "\ninTelegram " + Boolean(window.Telegram?.WebApp?.initData) +
-    "\nover: " + (findOverflow().join("  ") || "nothing past the edge");
 }
 
 pinWidth();
@@ -557,8 +518,6 @@ function render() {
   $("add").onclick = () => openForm(null);
 }
 
-const BUILD = "b9";
-
 function renderKey() {
   // First name only: full names blow the header wider than the screen.
   $("key").innerHTML = DATA.people.map((p,i) =>
@@ -566,13 +525,7 @@ function renderKey() {
     + '<i class="swatch" style="background:'+colour(i)+'"></i>'
     + esc(p.name.trim().split(/\s+/)[0])
     + '<span class="sr"> '+esc(p.name)+(p.id===ME?" (you)":"")+'</span></span>').join("")
-    + '<button class="build" id="build" title="Tap for layout info">'+BUILD+'</button>';
-  $("build").onclick = () => {
-    const on = !document.getElementById("dbg");
-    if (on) showDebug(parseInt(getComputedStyle(document.documentElement)
-      .getPropertyValue("--app-w")) || window.innerWidth);
-    else document.getElementById("dbg").remove();
-  };
+    ;
 }
 
 function renderNav() {
