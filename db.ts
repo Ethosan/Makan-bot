@@ -35,6 +35,8 @@ export interface Env {
   SITE_URL?: string;
   /** Optional. If set, the site and its photos require ?k=<this value>. */
   SITE_KEY?: string;
+  /** Optional. Lets the Netlify site tell the bot to redraw its pinned board. */
+  REFRESH_SECRET?: string;
 }
 
 export function db(env: Env): SupabaseClient {
@@ -376,4 +378,10 @@ export async function setBoard(
   messageId: number
 ) {
   await sb.from("boards").upsert({ chat_id: chatId, thread_id: threadId, message_id: messageId });
+}
+
+/** Every chat with a pinned board, for the website's refresh hook. */
+export async function allBoardChats(sb: SupabaseClient): Promise<number[]> {
+  const { data } = await sb.from("boards").select("chat_id");
+  return (data ?? []).map((b: any) => Number(b.chat_id));
 }
