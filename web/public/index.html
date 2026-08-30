@@ -257,12 +257,44 @@ const pos = s => ((s - 1) / 9) * 100;
 const shortDate = d => d ? new Date(d + "T00:00:00")
   .toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"2-digit"}) : "no date";
 
+/**
+ * Phone photos are 3-8MB at 4000px. Base64 adds a third on top, and Netlify
+ * rejects request bodies over 6MB before the function ever runs. Downscaling
+ * here keeps uploads around 200-400KB and makes the page load faster too.
+ */
+const MAX_EDGE = 1600;
+function shrink(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("That file isn't an image")); };
+    img.src = url;
+  });
+}
+
 async function api(action, payload = {}) {
   const res = await fetch("/api", {
     method:"POST", headers:{"content-type":"application/json"},
     body: JSON.stringify({action, password: PW, ...payload})
   });
-  const out = await res.json().catch(() => ({error:"The server didn't respond"}));
+  let out;
+  try {
+    out = await res.json();
+  } catch {
+    // Non-JSON means the request never reached the function.
+    throw new Error(res.status === 413
+      ? "That photo is too large to upload."
+      : "The server didn't respond (" + res.status + "). Try again.");
+  }
   if (!res.ok) throw new Error(out.error || "Something went wrong");
   return out;
 }
@@ -567,18 +599,21 @@ function drawPhoto(title) {
     {steps: STEPS, step: 1});
 
   $("f-drop").onclick = () => $("f-file").click();
-  $("f-file").onchange = () => {
+  $("f-file").onchange = async () => {
     const file = $("f-file").files[0];
     if (!file) return;
-    if (file.size > 8_000_000) { $("f-note").textContent = "That image is over 8MB \u2014 pick a smaller one."; return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      draft.dataUrl = reader.result;
-      $("f-thumb").src = reader.result;
+    const note = $("f-note");
+    note.style.color = "var(--muted)";
+    note.textContent = "Preparing\u2026";
+    try {
+      draft.dataUrl = await shrink(file);
+      $("f-thumb").src = draft.dataUrl;
       $("f-drop").classList.add("has");
-      $("f-note").textContent = "";
-    };
-    reader.readAsDataURL(file);
+      note.textContent = "";
+    } catch (err) {
+      note.style.color = "var(--spark)";
+      note.textContent = err.message;
+    }
   };
   $("f-skip").onclick = () => { step = 2; drawStep(); };
   $("f-next").onclick = () => { step = 2; drawStep(); };
