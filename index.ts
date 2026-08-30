@@ -1,7 +1,8 @@
 import { webhookCallback } from "grammy";
 import { createBot } from "./bot";
-import { db, type Env } from "./db";
+import { allBoardChats, db, type Env } from "./db";
 import { buildPayload } from "./payload";
+import { refreshBoard } from "./leaderboard";
 import { servePhoto } from "./photos";
 import { renderSite } from "./site";
 
@@ -26,6 +27,19 @@ export default {
       return webhookCallback(bot, "cloudflare-mod")(request);
     }
 
+    /* ---- redraw the pinned board after an edit made on the website ---- */
+    if (url.pathname === "/refresh" && request.method === "POST") {
+      if (!env.REFRESH_SECRET || request.headers.get("x-refresh-secret") !== env.REFRESH_SECRET) {
+        return new Response("unauthorized", { status: 401 });
+      }
+      const sb = db(env);
+      const bot = createBot(env);
+      for (const chatId of await allBoardChats(sb)) {
+        await refreshBoard(bot, sb, chatId).catch(() => {});
+      }
+      return new Response("ok");
+    }
+
     /* ---- photo proxy ---- */
     const photoMatch = url.pathname.match(/^\/photo\/(\d+)$/);
     if (photoMatch) {
@@ -33,9 +47,11 @@ export default {
       const sb = db(env);
       const { data } = await sb
         .from("restaurants")
-        .select("photo_file_id")
+        .select("photo_file_id, photo_url")
         .eq("id", Number(photoMatch[1]))
         .maybeSingle();
+      // Uploaded from the website? It already has a public URL.
+      if (data?.photo_url) return Response.redirect(data.photo_url as string, 302);
       if (!data?.photo_file_id) return new Response("no photo", { status: 404 });
       return servePhoto(data.photo_file_id as string, env, request);
     }
