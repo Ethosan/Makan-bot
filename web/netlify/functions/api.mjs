@@ -119,7 +119,10 @@ export default async (request) => {
         const m = String(body.dataUrl ?? "").match(/^data:(image\/[a-z+]+);base64,(.+)$/i);
         if (!m) return json({ error: "That file isn't an image" }, 400);
         const bytes = Buffer.from(m[2], "base64");
-        if (bytes.length > 8_000_000) return json({ error: "Image is over 8MB" }, 400);
+        // The browser downscales before sending; this is just a backstop.
+        if (bytes.length > 4_000_000) {
+          return json({ error: "That photo is too large. Try a smaller one." }, 413);
+        }
 
         const ext = m[1].split("/")[1].replace("jpeg", "jpg");
         const path = `${body.id}-${Date.now()}.${ext}`;
