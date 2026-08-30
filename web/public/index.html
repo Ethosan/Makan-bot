@@ -81,6 +81,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   white-space:nowrap}
 /* Own line, wrapping. A title-and-names row is the one pair guaranteed to be
    too wide on a narrow phone. */
+.build{margin-left:auto;color:var(--rule);letter-spacing:.1em}
 .key{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10px;
   letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:6px}
 .who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -532,13 +533,16 @@ function render() {
   $("add").onclick = () => openForm(null);
 }
 
+const BUILD = "b8";
+
 function renderKey() {
   // First name only: full names blow the header wider than the screen.
   $("key").innerHTML = DATA.people.map((p,i) =>
     '<span class="who'+(p.id===ME?" me":"")+'" title="'+esc(p.name)+'">'
     + '<i class="swatch" style="background:'+colour(i)+'"></i>'
     + esc(p.name.trim().split(/\s+/)[0])
-    + '<span class="sr"> '+esc(p.name)+(p.id===ME?" (you)":"")+'</span></span>').join("");
+    + '<span class="sr"> '+esc(p.name)+(p.id===ME?" (you)":"")+'</span></span>').join("")
+    + '<span class="build" aria-hidden="true">'+BUILD+'</span>';
 }
 
 function renderNav() {
