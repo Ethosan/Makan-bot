@@ -87,34 +87,42 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .who.me{color:var(--ink);font-weight:500}
 .swatch{width:8px;height:8px;border-radius:50%;display:inline-block;vertical-align:middle;
   margin-right:5px;flex:none}
-.filters{display:flex;gap:6px;overflow-x:auto;max-width:100%;padding:11px 0 12px;
-  scrollbar-width:none}
-.filters::-webkit-scrollbar{display:none}
-.filters button{flex:none;min-height:36px;padding:0 14px;font-family:var(--mono);font-size:11px;
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0 0}
+.modes button{min-height:38px;padding:0 10px;font-family:var(--mono);font-size:11px;
   letter-spacing:.09em;text-transform:uppercase;border:1px solid var(--rule);background:none;
-  color:var(--muted);border-radius:999px}
+  color:var(--muted);border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.modes button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+/* Wraps to a second line on narrow phones rather than scrolling sideways. */
+.filters{display:flex;flex-wrap:wrap;gap:6px;padding:9px 0 11px}
+.filters button{min-height:34px;padding:0 11px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.07em;text-transform:uppercase;border:1px solid var(--rule);background:none;
+  color:var(--muted);border-radius:999px;white-space:nowrap}
 .filters button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.filters[hidden]{display:none}
 
 /* ============ list row ============ */
-.row{display:grid;grid-template-columns:20px 56px minmax(0,1fr) 4.6ch;gap:0 10px;align-items:center;
-  max-width:100%;overflow:hidden;
+/* Two columns only. Everything textual lives in one shrinkable box, and the
+   score is an explicit flex:none so it can never be the thing that gets cut. */
+.row{display:grid;grid-template-columns:56px minmax(0,1fr);gap:0 12px;align-items:center;
   width:100%;padding:13px 0;border:0;border-bottom:1px solid var(--rule);background:none;
-  text-align:left;min-height:84px}
+  text-align:left;min-height:82px}
 .row:last-child{border-bottom:0}
-.row>span{min-width:0}
-.r-rank{font-family:var(--serif);font-size:23px;line-height:1;color:var(--brass);text-align:center}
+.r-body{min-width:0}
+.r-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.r-rank{flex:none;font-family:var(--serif);font-size:19px;line-height:1;color:var(--brass)}
 .r-rank.plain{color:var(--rule)}
+.r-name{flex:1 1 auto;min-width:0;font-family:var(--serif);font-size:20px;line-height:1.2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-score{flex:none;margin-left:auto;font-family:var(--mono);font-size:17px;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
 .r-thumb{width:56px;height:56px;border-radius:3px;background:var(--sink);object-fit:cover;
   display:block}
-.r-thumb.none{width:56px;height:56px;display:grid;place-items:center;font-family:var(--serif);font-size:21px;color:var(--rule)}
-.r-name{display:block;font-family:var(--serif);font-size:20px;line-height:1.15;margin:0 0 3px;
-  overflow-wrap:anywhere;
-  overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+.r-thumb.none{display:grid;place-items:center;font-family:var(--serif);font-size:21px;
+  color:var(--rule)}
 .r-meta{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--muted);overflow-wrap:anywhere}
-.r-score{font-family:var(--mono);font-size:17px;font-variant-numeric:tabular-nums;
-  align-self:center;white-space:nowrap;text-align:right;letter-spacing:-.02em}
-.r-track{position:relative;height:9px;margin-top:7px;margin-right:4px;overflow:hidden}
+  text-transform:uppercase;color:var(--muted);margin-top:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-track{position:relative;height:9px;margin-top:7px;margin-right:3px}
 .r-axis{position:absolute;top:4px;left:0;right:0;height:1px;background:var(--rule)}
 .r-span{position:absolute;top:3.5px;height:2px;background:var(--ink);opacity:.3;border-radius:2px}
 .r-span.wide{background:var(--spark);opacity:.75}
@@ -248,6 +256,7 @@ fieldset{border:0;padding:0;margin:0}
       <h1>The List</h1>
     </div>
     <div class="key" id="key"></div>
+    <nav class="modes" id="modes" aria-label="Which list"></nav>
     <nav class="filters" id="filters" aria-label="Filter by kind of place"></nav>
   </header>
   <main class="scroll" id="board" tabindex="-1"></main>
@@ -283,7 +292,7 @@ const HINT = {
 
 let PW = localStorage.getItem("makan.pw") || "";
 let ME = Number(localStorage.getItem("makan.me")) || null;
-let DATA = null, filter = "all", lastFocus = null;
+let DATA = null, mode = "rated", filter = "all", lastFocus = null;
 
 // Opened inside Telegram? Then Telegram signs who you are and we skip the
 // password and the picker entirely.
@@ -479,34 +488,34 @@ function rowHtml(e, rank) {
   if (e.gap >= 1.5) meta.push("split " + e.gap.toFixed(1));
   const label = e.name + ", " + e.combined.toFixed(2) + " out of 10, " + TIER_LABEL[e.tier];
   return '<button class="row" data-open="'+e.id+'" aria-label="'+esc(label)+'">'
-    + '<span class="r-rank'+(rank>3?" plain":"")+'" aria-hidden="true">'+rank+'</span>'
     + thumb(e)
-    + '<span><span class="r-name">'+esc(e.name)+'</span>'
-    + '<span class="r-meta">'+meta.join(" &middot; ")+'</span>'+miniTrack(e)+'</span>'
-    + '<span class="r-score">'+e.combined.toFixed(2)+'</span></button>';
+    + '<span class="r-body">'
+    +   '<span class="r-top">'
+    +     '<span class="r-rank'+(rank>3?" plain":"")+'" aria-hidden="true">'+rank+'</span>'
+    +     '<span class="r-name">'+esc(e.name)+'</span>'
+    +     '<span class="r-score">'+e.combined.toFixed(2)+'</span>'
+    +   '</span>'
+    +   '<span class="r-meta">'+meta.join(" &middot; ")+'</span>'
+    +   miniTrack(e)
+    + '</span></button>';
 }
 
 function pendHtml(e) {
   return '<button class="row" data-open="'+e.id+'" aria-label="'+esc(e.name+", not fully rated")+'">'
-    + '<span class="r-rank plain" aria-hidden="true">&middot;</span>'
     + thumb(e)
-    + '<span><span class="r-name">'+esc(e.name)+'</span>'
-    + '<span class="r-meta">'+esc(e.progress)+'</span></span>'
-    + '<span class="pend-tag">Rate</span></button>';
+    + '<span class="r-body"><span class="r-top">'
+    +   '<span class="r-name">'+esc(e.name)+'</span>'
+    +   '<span class="r-score"><span class="pend-tag">Rate</span></span>'
+    + '</span>'
+    + '<span class="r-meta">'+esc(e.progress)+'</span></span></button>';
 }
 
 function render() {
-  if (filter === "want") return renderWant();
+  if (mode === "want") return renderWant();
   const list = DATA.entries.filter(e => filter === "all" || e.tier === filter);
 
   renderKey();
-
-  $("filters").innerHTML =
-    [["all","Overall"],["cheap","Cheap"],["normal","Normal"],["fancy","Fancy"],["want","Want to eat"]]
-    .map(([t,l]) => '<button data-t="'+t+'" aria-pressed="'+(t===filter)+'">'
-      + l+' '+(DATA.counts[t]||0)+'</button>').join("");
-  $("filters").querySelectorAll("button").forEach(b =>
-    b.onclick = () => { filter = b.dataset.t; render(); $("board").scrollTop = 0; });
+  renderNav();
 
   let html = list.length
     ? list.map((e,i) => rowHtml(e, filter === "all" ? e.overallRank : i+1)).join("")
@@ -532,18 +541,28 @@ function renderKey() {
     + '<span class="sr"> '+esc(p.name)+(p.id===ME?" (you)":"")+'</span></span>').join("");
 }
 
-function renderFilters() {
-  $("filters").innerHTML =
-    [["all","Overall"],["cheap","Cheap"],["normal","Normal"],["fancy","Fancy"],["want","Want to eat"]]
+function renderNav() {
+  // Want-to-eat is a different list, not a tier. Splitting them means four
+  // short chips instead of five long ones, which fits without scrolling.
+  $("modes").innerHTML =
+    [["rated","Been " + (DATA.counts.all || 0)],["want","Want to eat " + (DATA.counts.want || 0)]]
+    .map(([m,l]) => '<button data-m="'+m+'" aria-pressed="'+(m===mode)+'">'+l+'</button>').join("");
+  $("modes").querySelectorAll("button").forEach(b =>
+    b.onclick = () => { mode = b.dataset.m; render(); $("board").scrollTop = 0; });
+
+  const tiers = $("filters");
+  tiers.hidden = mode !== "rated";
+  if (mode !== "rated") { tiers.innerHTML = ""; return; }
+  tiers.innerHTML = [["all","All"],["cheap","Cheap"],["normal","Normal"],["fancy","Fancy"]]
     .map(([t,l]) => '<button data-t="'+t+'" aria-pressed="'+(t===filter)+'">'
       + l+' '+(DATA.counts[t]||0)+'</button>').join("");
-  $("filters").querySelectorAll("button").forEach(b =>
+  tiers.querySelectorAll("button").forEach(b =>
     b.onclick = () => { filter = b.dataset.t; render(); $("board").scrollTop = 0; });
 }
 
 function renderWant() {
   renderKey();
-  renderFilters();
+  renderNav();
   const list = DATA.wishlist ?? [];
   $("board").innerHTML = list.length
     ? list.map(w =>
@@ -584,7 +603,7 @@ function rollOne(tier = null) {
     try {
       const {id} = await api("wantWent", {id: w.id, visited_on: new Date().toISOString().slice(0,10)});
       DATA = await api("list");
-      filter = "all";
+      mode = "rated"; filter = "all";
       panelClose();
       render();
       openForm(id, 2);
@@ -651,7 +670,7 @@ function openWantForm(w) {
       try {
         const {id} = await api("wantWent", {id: w.id, visited_on: new Date().toISOString().slice(0,10)});
         DATA = await api("list");
-        filter = "all";
+        mode = "rated"; filter = "all";
         panelClose();
         render();
         openForm(id, 2);
