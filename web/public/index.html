@@ -40,8 +40,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 /* ============ shell: page never scrolls, only the list ============ */
 .screen{height:var(--app-h);display:grid;grid-template-rows:auto minmax(0,1fr) auto}
-.scroll{overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
-  padding:0 var(--pad)}
+.scroll{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;padding:0 var(--pad)}
 .bar{padding:12px var(--pad) calc(14px + var(--tg-bottom));
   border-top:1px solid var(--rule);background:var(--paper);display:flex;gap:9px}
 
@@ -73,14 +73,17 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 /* ============ masthead ============ */
 .mast{padding:calc(12px + var(--tg-top)) var(--pad) 0}
-.mast-row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;
+.mast-row{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;
   border-bottom:2px solid var(--ink);padding-bottom:9px}
-.mast-row h1{font-family:var(--serif);font-weight:400;font-size:34px;line-height:1;margin:0}
-.key{display:flex;gap:11px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--muted);padding-bottom:3px}
-.who{display:flex;gap:5px;align-items:center}
+.mast-row h1{font-family:var(--serif);font-weight:400;font-size:32px;line-height:1;margin:0;
+  flex:0 0 auto}
+.key{display:flex;gap:10px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);padding-bottom:3px;
+  min-width:0;flex:0 1 auto;justify-content:flex-end;overflow:hidden}
+.who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .who.me{color:var(--ink);font-weight:500}
-.swatch{width:8px;height:8px;border-radius:50%;flex:none}
+.swatch{width:8px;height:8px;border-radius:50%;display:inline-block;vertical-align:middle;
+  margin-right:5px;flex:none}
 .filters{display:flex;gap:6px;overflow-x:auto;padding:11px 0 12px;scrollbar-width:none}
 .filters::-webkit-scrollbar{display:none}
 .filters button{flex:none;min-height:36px;padding:0 14px;font-family:var(--mono);font-size:11px;
@@ -89,20 +92,23 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .filters button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
 
 /* ============ list row ============ */
-.row{display:grid;grid-template-columns:22px 58px 1fr auto;gap:0 12px;align-items:center;
+.row{display:grid;grid-template-columns:22px 58px minmax(0,1fr) auto;gap:0 11px;align-items:center;
   width:100%;padding:13px 0;border:0;border-bottom:1px solid var(--rule);background:none;
   text-align:left;min-height:84px}
 .row:last-child{border-bottom:0}
+.row>span{min-width:0}
 .r-rank{font-family:var(--serif);font-size:23px;line-height:1;color:var(--brass);text-align:center}
 .r-rank.plain{color:var(--rule)}
 .r-thumb{width:58px;height:58px;border-radius:3px;background:var(--sink);object-fit:cover;
   display:block}
 .r-thumb.none{display:grid;place-items:center;font-family:var(--serif);font-size:21px;color:var(--rule)}
-.r-name{font-family:var(--serif);font-size:20px;line-height:1.15;margin:0 0 3px;
+.r-name{display:block;font-family:var(--serif);font-size:20px;line-height:1.15;margin:0 0 3px;
+  overflow-wrap:anywhere;
   overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
-.r-meta{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
-  color:var(--muted)}
-.r-score{font-family:var(--mono);font-size:17px;font-variant-numeric:tabular-nums;align-self:center}
+.r-meta{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);overflow-wrap:anywhere}
+.r-score{font-family:var(--mono);font-size:17px;font-variant-numeric:tabular-nums;
+  align-self:center;flex:none;white-space:nowrap}
 .r-track{position:relative;height:9px;margin-top:7px}
 .r-axis{position:absolute;top:4px;left:0;right:0;height:1px;background:var(--rule)}
 .r-span{position:absolute;top:3.5px;height:2px;background:var(--ink);opacity:.3;border-radius:2px}
@@ -110,11 +116,12 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .r-dot{position:absolute;top:1px;width:7px;height:7px;border-radius:50%;margin-left:-3.5px}
 .pend-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
   color:var(--muted);border:1px solid var(--rule);border-radius:999px;padding:3px 8px}
-.w-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;width:100%;
+.w-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;
   min-height:62px;padding:13px 0;border:0;border-bottom:1px solid var(--rule);background:none;
   text-align:left}
 .w-row:last-child{border-bottom:0}
-.w-name{font-family:var(--serif);font-size:21px;line-height:1.15}
+.w-name{display:block;font-family:var(--serif);font-size:21px;line-height:1.15;
+  overflow-wrap:anywhere}
 .w-note{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
   color:var(--muted);margin-top:3px}
 .chip{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
@@ -139,7 +146,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .panel.open{display:grid;grid-template-rows:auto minmax(0,1fr) auto}
 .p-head{padding:calc(12px + var(--tg-top)) var(--pad) 12px;
   border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:12px}
-.p-head h2{font-family:var(--serif);font-weight:400;font-size:25px;line-height:1.1;margin:0;flex:1;
+.p-head h2{font-family:var(--serif);font-weight:400;font-size:25px;line-height:1.1;margin:0;
+  flex:1;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .icon{width:var(--tap);height:var(--tap);flex:none;border:0;background:none;font-size:22px;
   display:grid;place-items:center;border-radius:4px}
@@ -149,13 +157,15 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .dots i.on{background:var(--ink)}
 
 .hero{width:100%;aspect-ratio:16/10;object-fit:cover;background:var(--sink);border-radius:4px}
-.d-name{font-family:var(--serif);font-size:32px;line-height:1.05;margin:18px 0 6px}
+.d-name{font-family:var(--serif);font-size:32px;line-height:1.05;margin:18px 0 6px;
+  overflow-wrap:anywhere}
 .d-meta{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
   color:var(--muted)}
 .d-total{font-family:var(--serif);font-size:60px;line-height:1;margin:20px 0 0}
 .d-sub{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
   color:var(--muted)}
-.grid{width:100%;border-collapse:collapse;margin-top:22px;font-family:var(--mono);font-size:12px}
+.grid{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:22px;
+  font-family:var(--mono);font-size:12px}
 .grid th,.grid td{padding:9px 4px;text-align:right;border-bottom:1px solid var(--rule)}
 .grid th:first-child,.grid td:first-child{text-align:left;letter-spacing:.09em;
   text-transform:uppercase;color:var(--muted);font-weight:400}
@@ -165,7 +175,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 /* ============ form steps ============ */
 .step{padding:var(--pad) 0}
-.q{font-family:var(--serif);font-size:29px;line-height:1.12;margin:0 0 6px}
+.q{font-family:var(--serif);font-size:29px;line-height:1.12;margin:0 0 6px;overflow-wrap:anywhere}
 .q-hint{font-family:var(--mono);font-size:11px;color:var(--muted);margin:0 0 22px}
 .field{margin-bottom:20px}
 .field>label,.legend{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.15em;
@@ -445,9 +455,7 @@ function render() {
   if (filter === "want") return renderWant();
   const list = DATA.entries.filter(e => filter === "all" || e.tier === filter);
 
-  $("key").innerHTML = DATA.people.map((p,i) =>
-    '<span class="who'+(p.id===ME?" me":"")+'"><i class="swatch" style="background:'+colour(i)+'"></i>'
-    + esc(p.name)+(p.id===ME?' <span class="sr">(you)</span>':"")+'</span>').join("");
+  renderKey();
 
   $("filters").innerHTML =
     [["all","Overall"],["cheap","Cheap"],["normal","Normal"],["fancy","Fancy"],["want","Want to eat"]]
@@ -472,9 +480,12 @@ function render() {
 }
 
 function renderKey() {
+  // First name only: full names blow the header wider than the screen.
   $("key").innerHTML = DATA.people.map((p,i) =>
-    '<span class="who'+(p.id===ME?" me":"")+'"><i class="swatch" style="background:'+colour(i)+'"></i>'
-    + esc(p.name)+(p.id===ME?' <span class="sr">(you)</span>':"")+'</span>').join("");
+    '<span class="who'+(p.id===ME?" me":"")+'" title="'+esc(p.name)+'">'
+    + '<i class="swatch" style="background:'+colour(i)+'"></i>'
+    + esc(p.name.trim().split(/\s+/)[0])
+    + '<span class="sr"> '+esc(p.name)+(p.id===ME?" (you)":"")+'</span></span>').join("");
 }
 
 function renderFilters() {
