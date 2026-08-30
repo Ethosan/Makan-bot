@@ -97,11 +97,7 @@ Reply to any card with a photo, or send one captioned <code>/photo <i>name</i></
 <b><u>Setup</u></b>
 <b>/site</b> \u2014 open the app
 <b>/setboard</b> \u2014 post &amp; pin the auto-updating board in this topic
-<b>/weights</b> \u2014 how each tier is scored
-
-<b><u>Backfilling a batch</u></b>
-<code>/quickadd Odette | fancy | 2025-12-02</code>
-<code>/bulk</code> then one place per line`;
+<b>/weights</b> \u2014 how each tier is scored`;
 
 export function createBot(env: Env): Bot {
   const bot = new Bot(env.BOT_TOKEN);
