@@ -145,6 +145,25 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   border:1px solid var(--rule);border-radius:999px;padding:4px 9px;color:var(--muted);white-space:nowrap}
 .chip.set{border-color:var(--ink);color:var(--ink)}
 .dice{font-family:var(--serif);font-size:44px;line-height:1;margin:0 0 4px}
+.stats{width:100%;display:flex;align-items:center;gap:8px;padding:9px 0 11px;margin-bottom:2px;
+  border:0;border-bottom:1px solid var(--rule);background:none;text-align:left;
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted)}
+.stats b{font-weight:500;color:var(--ink)}
+.stats span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stats i{flex:none;margin-left:auto;font-style:normal;color:var(--rule)}
+.stat-block{margin-bottom:26px}
+.stat-h{font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 8px}
+.stat-big{font-family:var(--serif);font-size:26px;line-height:1.2;margin:0}
+.stat-sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin:5px 0 0}
+.bars{display:grid;gap:7px;margin-top:4px}
+.bar-row{display:grid;grid-template-columns:5.5em minmax(0,1fr) 3em;gap:8px;align-items:center;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted)}
+.bar-track{height:6px;background:var(--sink);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px}
+.bar-row b{font-weight:500;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
 .section{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
   color:var(--muted);margin:26px 0 2px;padding-top:12px;border-top:1px solid var(--rule)}
 .empty{font-family:var(--serif);font-size:22px;color:var(--muted);text-align:center;padding:60px 10px}
@@ -506,9 +525,10 @@ function render() {
   renderKey();
   renderNav();
 
-  let html = list.length
+  const strip = statsStrip();
+  let html = (strip && DATA.entries.length >= 2 ? strip : "") + (list.length
     ? list.map((e,i) => rowHtml(e, filter === "all" ? e.overallRank : i+1)).join("")
-    : '<p class="empty">Nothing here yet.<br>Add a place below.</p>';
+    : '<p class="empty">Nothing here yet.<br>Add a place below.</p>');
 
   if (DATA.pending.length) {
     html += '<p class="section">Waiting on a rating</p>' + DATA.pending.map(pendHtml).join("");
@@ -516,6 +536,8 @@ function render() {
   $("board").innerHTML = html;
   $("board").querySelectorAll("[data-open]").forEach(b =>
     b.onclick = () => openDetail(Number(b.dataset.open)));
+  const statsBtn = $("board").querySelector(".stats");
+  if (statsBtn) statsBtn.onclick = openStats;
 
   $("app").querySelector(".bar").innerHTML =
     '<button class="btn ghost" id="roll">\u{1F501} Pick</button>'
@@ -575,6 +597,106 @@ function renderWant() {
   $("roll").onclick = () => rollOne();
   $("paste").onclick = openPaste;
   $("add").onclick = () => openWantForm(null);
+}
+
+/* ================= stats ================= */
+
+/** Everything the stats view needs, derived from what's already loaded. */
+function computeStats() {
+  const es = DATA.entries;
+  if (es.length < 2 || DATA.people.length < 2) return null;
+
+  const per = DATA.people.map(p => {
+    const mine = es.map(e => e.scores.find(s => s.personId === p.id)).filter(Boolean);
+    const avg = mine.reduce((a, s) => a + s.total, 0) / (mine.length || 1);
+    const cats = Object.fromEntries(CATS.map(c =>
+      [c, mine.reduce((a, s) => a + s[c], 0) / (mine.length || 1)]));
+    return {...p, avg, cats, n: mine.length};
+  });
+
+  const sorted = [...es].sort((a, b) => b.gap - a.gap);
+  const tiers = TIERS.map(t => {
+    const inT = es.filter(e => e.tier === t);
+    return {tier: t, n: inT.length,
+            avg: inT.length ? inT.reduce((a, e) => a + e.combined, 0) / inT.length : 0};
+  }).filter(t => t.n);
+
+  const generous = [...per].sort((a, b) => b.avg - a.avg)[0];
+  const harsh = [...per].sort((a, b) => a.avg - b.avg)[0];
+
+  return {
+    per, tiers,
+    count: es.length,
+    avg: es.reduce((a, e) => a + e.combined, 0) / es.length,
+    widest: sorted[0],
+    closest: sorted[sorted.length - 1],
+    generous, harsh,
+    spread: generous.avg - harsh.avg,
+    splits: es.filter(e => e.gap >= 1.5).length,
+  };
+}
+
+function statsStrip() {
+  const st = computeStats();
+  if (!st) return "";
+  const line = st.spread >= 0.15
+    ? esc(st.generous.name.split(/\s+/)[0]) + " rates <b>" + st.spread.toFixed(2)
+      + "</b> higher on average"
+    : "You two are within <b>" + st.spread.toFixed(2) + "</b> of each other";
+  return '<button class="stats" aria-label="See the numbers">'
+    + '<span>' + line + '</span><i>See more</i></button>';
+}
+
+function openStats() {
+  const st = computeStats();
+  if (!st) return;
+
+  const bar = (label, val, max, col) =>
+    '<div class="bar-row"><span>' + label + '</span>'
+    + '<span class="bar-track"><span class="bar-fill" style="width:'
+    + Math.max(3, (val / max) * 100) + '%;background:' + col + '"></span></span>'
+    + '<b>' + val.toFixed(2) + '</b></div>';
+
+  let body = '<div class="step">';
+
+  body += '<div class="stat-block"><p class="stat-h">Who scores higher</p>'
+    + '<p class="stat-big">' + (st.spread >= 0.15
+        ? esc(st.generous.name) + ' by ' + st.spread.toFixed(2)
+        : 'Neck and neck')
+    + '</p><p class="stat-sub">Average weighted score across all '
+    + st.count + ' places</p><div class="bars">'
+    + st.per.map((p, i) => bar(p.name.split(/\s+/)[0], p.avg, 10, colour(idx(p.id)))).join("")
+    + '</div></div>';
+
+  body += '<div class="stat-block"><p class="stat-h">What each of you weighs</p>'
+    + '<p class="stat-sub" style="margin:0 0 10px">Your average out of 10 per category</p>'
+    + CATS.map(c =>
+        '<div style="margin-bottom:11px"><div class="bars">'
+        + st.per.map(p => bar(c === CATS[0] ? p.name.split(/\s+/)[0] : p.name.split(/\s+/)[0],
+            p.cats[c], 10, colour(idx(p.id)))).join("")
+        + '</div><p class="stat-sub" style="margin-top:4px">' + c + '</p></div>').join("")
+    + '</div>';
+
+  body += '<div class="stat-block"><p class="stat-h">Biggest disagreement</p>'
+    + '<p class="stat-big">' + esc(st.widest.name) + '</p>'
+    + '<p class="stat-sub">' + st.widest.gap.toFixed(2) + ' apart \u00b7 '
+    + st.splits + ' of ' + st.count + ' places split by 1.5 or more</p></div>';
+
+  body += '<div class="stat-block"><p class="stat-h">Most agreed on</p>'
+    + '<p class="stat-big">' + esc(st.closest.name) + '</p>'
+    + '<p class="stat-sub">' + st.closest.gap.toFixed(2) + ' apart</p></div>';
+
+  const maxTier = Math.max(...st.tiers.map(t => t.avg), 1);
+  body += '<div class="stat-block"><p class="stat-h">Average by tier</p><div class="bars">'
+    + st.tiers.map(t => bar(TIER_LABEL[t.tier], t.avg, maxTier, "var(--brass)")).join("")
+    + '</div><p class="stat-sub">Overall average ' + st.avg.toFixed(2) + '</p></div>';
+
+  body += '</div>';
+
+  panelClose();
+  panelOpen("The numbers", body, '<button class="btn" id="s-close">Done</button>');
+  $("p-back").dataset.act = "close";
+  $("s-close").onclick = panelClose;
 }
 
 /**
