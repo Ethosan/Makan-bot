@@ -28,6 +28,16 @@ import {
 import { escapeHtml, refreshBoard, renderBoard, revealText } from "./leaderboard";
 import { mirrorToStorage } from "./photos";
 import {
+  addWant,
+  dropWant,
+  pick,
+  rollKeyboard,
+  rollText,
+  wantById,
+  wantListText,
+  wants,
+} from "./wishlist";
+import {
   CATEGORY_HINT,
   CATEGORY_LABEL,
   TIERS,
@@ -39,6 +49,7 @@ import {
   nextCategory,
   parseTier,
   type Rating,
+  type Tier,
 } from "./scoring";
 import {
   NAME_PROMPT,
@@ -69,6 +80,11 @@ const HELP = `${TIER_EMOJI.fancy} <b>Restaurant list</b>
 <b>/todo</b> — what's still waiting on you
 <b>/board</b> — print the leaderboard
 <b>/site</b> — link to the web version, with photos
+
+<i>Want to eat:</i>
+<b>/want <i>name</i></b> — add one. Reply to a post with it to keep the link.
+<b>/wants</b> — the whole want list
+<b>/random</b> — pick one for us. <code>/random cheap</code> to narrow it.
 <b>/setboard</b> — post &amp; pin the auto-updating board here
 <b>/when <i>name</i> 2025-12-02</b> — set a date you skipped
 <b>photo</b> — reply to a card with one, or caption it <code>/photo <i>name</i></code>. Only one of you needs to.
@@ -560,6 +576,123 @@ export function createBot(env: Env): Bot {
     await deleteRestaurant(sb, restaurant.id);
     await refreshBoard(bot, sb, ctx.chat.id);
     return reply(ctx, `Removed <b>${escapeHtml(restaurant.name)}</b>.`);
+  });
+
+  /* ---------------- want to eat ---------------- */
+
+  bot.command("want", async (ctx) => {
+    const args = (ctx.match as string)?.trim();
+    const replied = ctx.message?.reply_to_message;
+
+    // Reply to a reel or screenshot with /want and the bot indexes it without
+    // you having to retype anything but the name.
+    if (!args) {
+      return reply(
+        ctx,
+        "Usage: <code>/want Kok Sen</code>, or <code>/want Kok Sen | cheap</code>.\n" +
+          "<i>Reply to a post with it and I'll keep the link to that message.</i>"
+      );
+    }
+
+    const [name, rawTier, ...rest] = args.split("|").map((x) => x.trim());
+    const tier = rawTier ? parseTier(rawTier) : null;
+    if (rawTier && !tier) return reply(ctx, "Tier should be cheap, normal or fancy.");
+
+    const { want, error } = await addWant(sb, {
+      chat_id: ctx.chat.id,
+      name,
+      tier,
+      note: rest.join(" | ") || null,
+      source_message_id: replied?.message_id ?? null,
+      added_by: ctx.from?.id ?? null,
+    });
+    if (error || !want) return reply(ctx, `Couldn't add it \u2014 ${escapeHtml(error ?? "?")}.`);
+
+    return reply(
+      ctx,
+      `Added <b>${escapeHtml(want.name)}</b> to the want list` +
+        (tier ? ` as <i>${TIER_LABEL[tier]}</i>.` : ". <i>Tag the tier later if you like.</i>")
+    );
+  });
+
+  bot.command(["wants", "wishlist"], async (ctx) =>
+    reply(ctx, wantListText(await wants(sb, ctx.chat.id)))
+  );
+
+  bot.command("random", async (ctx) => {
+    const raw = (ctx.match as string)?.trim();
+    const tier = raw ? parseTier(raw) : null;
+    if (raw && !tier) return reply(ctx, "Try <code>/random</code>, or <code>/random cheap</code>.");
+    return roll(ctx, tier);
+  });
+
+  async function roll(ctx: Context, tier: Tier | null) {
+    const list = await wants(sb, ctx.chat!.id, tier);
+    const chosen = pick(list);
+    if (!chosen) {
+      return reply(
+        ctx,
+        tier
+          ? `Nothing tagged <i>${TIER_LABEL[tier]}</i> on the want list yet.`
+          : "The want list is empty. Add one with <code>/want Name</code>."
+      );
+    }
+    return ctx.reply(rollText(chosen, tier), {
+      parse_mode: "HTML",
+      message_thread_id: ctx.message?.message_thread_id,
+      reply_markup: rollKeyboard(chosen, tier),
+    });
+  }
+
+  bot.callbackQuery(/^w:roll:(cheap|normal|fancy|any)$/, async (ctx) => {
+    const raw = ctx.match![1];
+    const tier = raw === "any" ? null : (raw as Tier);
+    const list = await wants(sb, ctx.chat!.id, tier);
+    const chosen = pick(list.length > 1 ? list.filter((w) => !ctx.callbackQuery.message?.text?.includes(w.name)) : list)
+      ?? pick(list);
+    if (!chosen) return ctx.answerCallbackQuery({ text: "Nothing left to pick from." });
+
+    await ctx.editMessageText(rollText(chosen, tier), {
+      parse_mode: "HTML",
+      reply_markup: rollKeyboard(chosen, tier),
+    });
+    return ctx.answerCallbackQuery();
+  });
+
+  // "We went" moves it off the want list and straight onto the rating card.
+  bot.callbackQuery(/^w:went:(\d+)$/, async (ctx) => {
+    const want = await wantById(sb, Number(ctx.match![1]));
+    if (!want) return ctx.answerCallbackQuery({ text: "Already gone from the list." });
+
+    const { restaurant, error } = await addRestaurant(sb, {
+      chat_id: want.chat_id,
+      name: want.name,
+      tier: want.tier ?? "normal",
+      visited_on: localDate(0),
+    });
+    if (error || !restaurant) {
+      return ctx.answerCallbackQuery({ text: `Couldn't add it \u2014 ${error}`, show_alert: true });
+    }
+
+    await dropWant(sb, want.id);
+    await ctx.editMessageText(
+      `\u2705 <b>${escapeHtml(want.name)}</b> moved off the want list.` +
+        (want.tier ? "" : "\n<i>Filed as Normal \u2014 change it on the card if that's wrong.</i>"),
+      { parse_mode: "HTML" }
+    );
+    await postCard(want.chat_id, ctx.callbackQuery.message?.message_thread_id ?? null, restaurant);
+    await refreshBoard(bot, sb, want.chat_id);
+    return ctx.answerCallbackQuery({ text: "Now rate it." });
+  });
+
+  bot.callbackQuery(/^w:drop:(\d+)$/, async (ctx) => {
+    const want = await wantById(sb, Number(ctx.match![1]));
+    if (!want) return ctx.answerCallbackQuery({ text: "Already gone." });
+    await dropWant(sb, want.id);
+    await ctx.editMessageText(`Took <b>${escapeHtml(want.name)}</b> off the want list.`, {
+      parse_mode: "HTML",
+    });
+    return ctx.answerCallbackQuery();
   });
 
   /* ---------------- batch fast paths ---------------- */
