@@ -25,6 +25,7 @@
   --tap:46px;
   /* Overridden inside Telegram, where env() reads as zero. */
   --app-h:100dvh;
+  --app-w:100%;
   --tg-top:env(safe-area-inset-top);
   --tg-bottom:env(safe-area-inset-bottom);
 }
@@ -40,7 +41,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* ============ shell: page never scrolls, only the list ============ */
-.screen{height:var(--app-h);width:100%;max-width:100%;overflow-x:clip;
+.screen{height:var(--app-h);width:var(--app-w);max-width:100%;margin:0 auto;overflow-x:clip;
   display:grid;grid-template-rows:auto minmax(0,1fr) auto}
 .scroll{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;padding:0 var(--pad)}
@@ -48,7 +49,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   border-top:1px solid var(--rule);background:var(--paper);display:flex;gap:9px}
 
 /* ============ gate ============ */
-.gate{height:var(--app-h);display:grid;grid-template-rows:1fr auto;
+.gate{height:var(--app-h);width:var(--app-w);max-width:100%;margin:0 auto;display:grid;grid-template-rows:1fr auto;
   padding:calc(var(--pad) + var(--tg-top)) var(--pad) calc(var(--pad) + var(--tg-bottom))}
 .gate-mid{display:flex;flex-direction:column;justify-content:center;min-height:0}
 .mark{font-family:var(--serif);font-weight:400;font-size:clamp(56px,19vw,96px);
@@ -146,7 +147,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .btn.slim{flex:0 0 auto}
 
 /* ============ panel ============ */
-.panel{position:fixed;left:0;top:0;right:0;height:var(--app-h);z-index:40;
+.panel{position:fixed;left:50%;transform:translateX(-50%);top:0;width:var(--app-w);
+  max-width:100%;height:var(--app-h);z-index:40;overflow-x:clip;
   background:var(--paper);display:none}
 .panel.open{display:grid;grid-template-rows:auto minmax(0,1fr) auto}
 .p-head{padding:calc(12px + var(--tg-top)) var(--pad) 12px;
@@ -209,6 +211,8 @@ fieldset{border:0;padding:0;margin:0}
 .drop.has span{display:none}
 .status{font-family:var(--mono);font-size:12px;margin-top:14px;min-height:18px;color:var(--spark)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+#dbg{position:fixed;left:0;right:0;bottom:0;z-index:99;background:#191E19;color:#F1F3EB;
+  font-family:var(--mono);font-size:10px;padding:6px 8px;line-height:1.5;white-space:pre-wrap}
 </style>
 </head>
 <body>
@@ -306,10 +310,45 @@ if (TG) {
   };
   applyInsets();
   ["viewportChanged","safeAreaChanged","contentSafeAreaChanged"].forEach(ev => {
-    try { TG.onEvent(ev, applyInsets); } catch {}
+    try { TG.onEvent(ev, () => { applyInsets(); pinWidth(); }); } catch {}
   });
   document.documentElement.classList.add("in-tg");
 }
+
+/**
+ * Telegram's webview can report a layout viewport wider than what's actually
+ * visible, which pushes the right edge of everything off screen. Pin the app to
+ * the narrowest width any API reports.
+ */
+function pinWidth() {
+  const cands = [
+    document.documentElement.clientWidth,
+    window.innerWidth,
+    window.visualViewport?.width,
+  ].filter(n => typeof n === "number" && n > 0);
+  if (!cands.length) return;
+  const w = Math.floor(Math.min(...cands));
+  document.documentElement.style.setProperty("--app-w", w + "px");
+  if (location.search.includes("debug")) showDebug(w);
+}
+
+function showDebug(w) {
+  let el = document.getElementById("dbg");
+  if (!el) { el = document.createElement("div"); el.id = "dbg"; document.body.appendChild(el); }
+  const b = document.body.getBoundingClientRect();
+  el.textContent =
+    "clientWidth " + document.documentElement.clientWidth +
+    "  innerWidth " + window.innerWidth +
+    "  visual " + Math.round(window.visualViewport?.width ?? 0) +
+    "\npinned " + w + "  body " + Math.round(b.width) +
+    "  scrollW " + document.documentElement.scrollWidth +
+    "  dpr " + window.devicePixelRatio +
+    "\ninTelegram " + Boolean(window.Telegram?.WebApp?.initData);
+}
+
+pinWidth();
+window.addEventListener("resize", pinWidth);
+window.visualViewport?.addEventListener("resize", pinWidth);
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
