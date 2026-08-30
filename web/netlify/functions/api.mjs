@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import crypto from "node:crypto";
 
 /**
  * Everything the site does goes through here, so the Supabase key never
@@ -6,6 +7,9 @@ import { createClient } from "@supabase/supabase-js";
  */
 
 const TIERS = ["cheap", "normal", "fancy"];
+const TIER_LABEL = { cheap: "Cheap eats", normal: "Normal", fancy: "Fancy" };
+const escapeHtml = (s) =>
+  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const CATS = ["food", "ambiance", "aesthetics", "service"];
 
 const WEIGHTS = {
@@ -13,6 +17,75 @@ const WEIGHTS = {
   normal: { food: 0.50, ambiance: 0.20, aesthetics: 0.10, service: 0.20 },
   fancy:  { food: 0.40, ambiance: 0.20, aesthetics: 0.15, service: 0.25 },
 };
+
+/** The group this site is bound to. Everything is scoped to it, so the site and
+ *  the pinned Telegram board always show the same list. */
+const chatId = () => Number(process.env.CHAT_ID ?? 0);
+
+/**
+ * When the site is opened as a Telegram Mini App, Telegram signs a blob telling
+ * us exactly who the user is. Verifying it against the bot token is real
+ * authentication — better than the shared password, and it means we know which
+ * of them is rating without asking.
+ * https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+ */
+function verifyInitData(initData) {
+  if (!initData || !process.env.BOT_TOKEN) return null;
+  const params = new URLSearchParams(initData);
+  const hash = params.get("hash");
+  if (!hash) return null;
+  params.delete("hash");
+
+  const check = [...params.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("\n");
+
+  const secret = crypto.createHmac("sha256", "WebAppData").update(process.env.BOT_TOKEN).digest();
+  const expected = crypto.createHmac("sha256", secret).update(check).digest("hex");
+
+  const a = Buffer.from(expected, "hex");
+  const b = Buffer.from(hash, "hex");
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+
+  // Reject anything older than a day, so a copied link can't be replayed forever.
+  const authDate = Number(params.get("auth_date") ?? 0);
+  if (!authDate || Date.now() / 1000 - authDate > 86400) return null;
+
+  try {
+    const user = JSON.parse(params.get("user") ?? "null");
+    return user?.id ? { id: Number(user.id), name: user.first_name ?? "Someone" } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Posts to the group. Used when something changes on the site. */
+async function announce(text, replyMarkup) {
+  if (!process.env.BOT_TOKEN || !chatId()) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId(),
+        message_thread_id: process.env.TOPIC_ID ? Number(process.env.TOPIC_ID) : undefined,
+        text,
+        parse_mode: "HTML",
+        disable_notification: true,
+        link_preview_options: { is_disabled: true },
+        reply_markup: replyMarkup,
+      }),
+    });
+  } catch {
+    // An announcement failing shouldn't fail the save.
+  }
+}
+
+const openButton = () =>
+  process.env.MINIAPP_URL
+    ? { inline_keyboard: [[{ text: "Open the list", url: process.env.MINIAPP_URL }]] }
+    : undefined;
 
 const sb = () =>
   createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
@@ -51,11 +124,23 @@ export default async (request) => {
     return json({ error: "Bad request" }, 400);
   }
 
-  if (body.password !== process.env.SITE_PASSWORD) {
+  // Two ways in. Inside Telegram we know exactly who this is; in a plain
+  // browser the shared password gets you in and you say who you are.
+  const tgUser = verifyInitData(body.initData);
+  if (!tgUser && body.password !== process.env.SITE_PASSWORD) {
     return json({ error: "Wrong password" }, 401);
   }
 
   const db = sb();
+
+  if (body.action === "whoami") {
+    return json({ verified: Boolean(tgUser), me: tgUser?.id ?? null });
+  }
+
+  // A verified Telegram user can only ever write their own scores.
+  if (tgUser && body.personId && Number(body.personId) !== tgUser.id) {
+    return json({ error: "You can only set your own scores" }, 403);
+  }
 
   try {
     switch (body.action) {
@@ -69,7 +154,7 @@ export default async (request) => {
         const { data, error } = await db
           .from("restaurants")
           .insert({
-            chat_id: Number(process.env.CHAT_ID ?? 0),
+            chat_id: chatId(),
             name: name.trim(),
             tier,
             visited_on: visited_on || null,
@@ -83,26 +168,37 @@ export default async (request) => {
           );
         }
         await pingBot();
+        await announce(
+          `\u{1F4CD} <b>${escapeHtml(name.trim())}</b> added \u2014 ${TIER_LABEL[tier]}. Both of you need to rate it.`,
+          openButton()
+        );
         return json({ id: data.id });
       }
 
       case "update": {
+        // Scoped by chat so the site can never edit another group's rows.
         const patch = {};
         if (body.name !== undefined) patch.name = String(body.name).trim();
         if (body.tier !== undefined) patch.tier = body.tier;
         if (body.visited_on !== undefined) patch.visited_on = body.visited_on || null;
-        const { error } = await db.from("restaurants").update(patch).eq("id", body.id);
+        const { error } = await db
+          .from("restaurants")
+          .update(patch)
+          .eq("id", body.id)
+          .eq("chat_id", chatId());
         if (error) return json({ error: error.message }, 400);
         await pingBot();
         return json({ ok: true });
       }
 
       case "delete":
-        await db.from("restaurants").delete().eq("id", body.id);
+        await db.from("restaurants").delete().eq("id", body.id).eq("chat_id", chatId());
         await pingBot();
         return json({ ok: true });
 
       case "rate": {
+        const before = await buildList(db);
+        const wasComplete = before.entries.some((e) => e.id === Number(body.id));
         const row = { restaurant_id: body.id, telegram_id: body.personId, updated_at: new Date().toISOString() };
         for (const c of CATS) {
           const v = body[c];
@@ -111,7 +207,87 @@ export default async (request) => {
         const { error } = await db.from("ratings").upsert(row);
         if (error) return json({ error: error.message }, 400);
         await pingBot();
+
+        // Only shout when the place is finished, so the group isn't spammed
+        // with a message per tap.
+        const fresh = await buildList(db);
+        const done = fresh.entries.find((e) => e.id === Number(body.id));
+        if (done && !wasComplete) {
+          const lines = [
+            `\u{1F513} <b>${escapeHtml(done.name)}</b> is in.`,
+            `Combined <b>${done.combined.toFixed(2)}</b> \u00b7 #${done.overallRank} overall, #${done.tierRank} in ${TIER_LABEL[done.tier].toLowerCase()}`,
+          ];
+          if (done.gap >= 1.5) lines.push(`\u26A1 You were ${done.gap.toFixed(2)} apart on this one.`);
+          await announce(lines.join("\n"), openButton());
+        }
         return json({ ok: true });
+      }
+
+      /* ---- want to eat ---- */
+
+      case "wantAdd": {
+        const name = String(body.name ?? "").trim();
+        if (!name) return json({ error: "Needs a name" }, 400);
+        const tier = TIERS.includes(body.tier) ? body.tier : null;
+        const { data, error } = await db
+          .from("wishlist")
+          .insert({ chat_id: chatId(), name, tier, note: body.note || null })
+          .select()
+          .single();
+        if (error) {
+          return json(
+            { error: error.code === "23505" ? "Already on the want list" : error.message },
+            400
+          );
+        }
+        return json({ id: data.id });
+      }
+
+      case "wantUpdate": {
+        const patch = {};
+        if (body.name !== undefined) patch.name = String(body.name).trim();
+        if (body.tier !== undefined) patch.tier = TIERS.includes(body.tier) ? body.tier : null;
+        await db.from("wishlist").update(patch).eq("id", body.id).eq("chat_id", chatId());
+        return json({ ok: true });
+      }
+
+      case "wantDrop":
+        await db.from("wishlist").delete().eq("id", body.id).eq("chat_id", chatId());
+        return json({ ok: true });
+
+      case "wantWent": {
+        // Moves it off the want list and onto the rated list in one step.
+        const { data: w } = await db
+          .from("wishlist")
+          .select("*")
+          .eq("id", body.id)
+          .eq("chat_id", chatId())
+          .maybeSingle();
+        if (!w) return json({ error: "That one's already gone" }, 404);
+
+        const { data, error } = await db
+          .from("restaurants")
+          .insert({
+            chat_id: chatId(),
+            name: w.name,
+            tier: w.tier ?? "normal",
+            visited_on: body.visited_on || null,
+          })
+          .select()
+          .single();
+        if (error) {
+          return json(
+            { error: error.code === "23505" ? "Already on the rated list" : error.message },
+            400
+          );
+        }
+        await db.from("wishlist").delete().eq("id", w.id);
+        await pingBot();
+        await announce(
+          `\u{1F4CD} <b>${escapeHtml(w.name)}</b> \u2014 off the want list, onto the real one.`,
+          openButton()
+        );
+        return json({ id: data.id });
       }
 
       case "photo": {
@@ -153,12 +329,20 @@ async function buildList(db) {
   const [{ data: places }, { data: people }] = await Promise.all([
     db
       .from("restaurants")
-      .select("id, name, tier, visited_on, photo_url, ratings(telegram_id, food, ambiance, aesthetics, service)"),
+      .select("id, name, tier, visited_on, photo_url, ratings(telegram_id, food, ambiance, aesthetics, service)")
+      .eq("chat_id", chatId()),
     db.from("people").select("telegram_id, display_name"),
   ]);
 
   const roster = (people ?? []).map((p) => ({ id: Number(p.telegram_id), name: p.display_name }));
   const needed = Math.max(2, roster.length);
+
+  const { data: wishRows } = await db
+    .from("wishlist")
+    .select("id, name, tier, note")
+    .eq("chat_id", chatId())
+    .order("created_at", { ascending: false });
+  const wishlist = (wishRows ?? []).map((w) => ({ ...w, id: Number(w.id) }));
 
   const entries = [];
   const pending = [];
@@ -214,5 +398,6 @@ async function buildList(db) {
   const counts = { all: entries.length };
   for (const tier of TIERS) counts[tier] = entries.filter((e) => e.tier === tier).length;
 
-  return { people: roster, entries, pending, counts };
+  counts.want = wishlist.length;
+  return { people: roster, entries, pending, wishlist, counts };
 }
