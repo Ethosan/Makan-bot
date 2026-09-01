@@ -5,13 +5,61 @@ import { buildPayload } from "./payload";
 import { refreshBoard } from "./leaderboard";
 import { servePhoto } from "./photos";
 import { renderSite } from "./site";
+import { InlineKeyboard } from "grammy";
+import { currentCycle, goalsOf, monthOf } from "./goals";
+import { checkinList, midpointPrompt, reviewPrompt } from "./goalcards";
+import { peopleMap } from "./db";
 
 function authorised(url: URL, env: Env): boolean {
   if (!env.SITE_KEY) return true;
   return url.searchParams.get("k") === env.SITE_KEY;
 }
 
+/**
+ * Monthly nudge. The cadence is the whole feature: people don't fail at the
+ * review, they fail in month two. Three different messages depending on where
+ * the cycle is - a normal check-in, a "is this still right?" at the halfway
+ * mark, and the review prompts at the end.
+ */
+async function monthlyNudge(env: Env) {
+  const sb = db(env);
+  const bot = createBot(env);
+
+  const { data: rows } = await sb.from("cycles").select("chat_id").eq("closed", false);
+  const chats = [...new Set((rows ?? []).map((r: any) => Number(r.chat_id)))];
+
+  for (const chatId of chats) {
+    try {
+      const cycle = await currentCycle(sb, chatId);
+      if (!cycle) continue;
+      const goals = await goalsOf(sb, cycle.id);
+      if (!goals.length) continue;
+
+      const month = monthOf(cycle);
+      const names = await peopleMap(sb);
+
+      if (month >= 5) {
+        await bot.api.sendMessage(chatId, reviewPrompt(cycle, goals), { parse_mode: "HTML" });
+        continue;
+      }
+
+      if (month === 3) {
+        await bot.api.sendMessage(chatId, midpointPrompt(cycle, goals), { parse_mode: "HTML" });
+      }
+
+      const { text, keyboard } = checkinList(goals, names);
+      await bot.api.sendMessage(chatId, text, { parse_mode: "HTML", reply_markup: keyboard });
+    } catch (e) {
+      console.error("nudge failed", chatId, e);
+    }
+  }
+}
+
 export default {
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(monthlyNudge(env));
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
