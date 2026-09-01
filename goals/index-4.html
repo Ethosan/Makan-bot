@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="theme-color" content="#E3E7EB">
+<title>Four Months</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Cool and technical on purpose: this is a plan, not a menu. Contrast checked
+   against the ground — muted 5.45, amber 4.76, everything else above 5. */
+:root{
+  --ground:#E3E7EB; --card:#F3F5F7; --sink:#D5DBE1;
+  --ink:#15181D; --muted:#545C66; --rule:#B6BEC7;
+  --accent:#2A4B7C;
+  --on:#1F6A4A; --slip:#8A5A08; --stall:#9B2C2C;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --sans:"Space Grotesk",system-ui,sans-serif;
+  --pad:clamp(18px,5.5vw,28px);
+  --tap:46px;
+  --app-h:100dvh; --app-w:100%;
+  --tg-top:env(safe-area-inset-top); --tg-bottom:env(safe-area-inset-bottom);
+}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+html,body{height:100%;width:100%;max-width:100%;margin:0;overflow:hidden;overflow-x:clip}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:16px;
+  line-height:1.45;-webkit-font-smoothing:antialiased;
+  /* Faint plan grid. */
+  background-image:linear-gradient(var(--rule) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--rule) 1px,transparent 1px);
+  background-size:28px 28px;background-position:-1px -1px;
+  background-blend-mode:normal}
+body:before{content:"";position:fixed;inset:0;background:var(--ground);opacity:.94;z-index:-1}
+button{font-family:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px;border-radius:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.screen{height:var(--app-h);width:var(--app-w);max-width:100%;margin:0 auto;overflow-x:clip;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.scroll{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:0 var(--pad)}
+.bar{padding:12px var(--pad) calc(14px + var(--tg-bottom));border-top:1px solid var(--rule);
+  background:var(--ground);display:flex;gap:9px}
+
+/* ---- gate ---- */
+.gate{height:var(--app-h);width:var(--app-w);max-width:100%;margin:0 auto;display:grid;
+  grid-template-rows:1fr auto;padding:calc(var(--pad) + var(--tg-top)) var(--pad)
+  calc(var(--pad) + var(--tg-bottom))}
+.gate-mid{display:flex;flex-direction:column;justify-content:center;min-height:0}
+.mark{font-family:var(--sans);font-weight:700;font-size:clamp(42px,13vw,66px);line-height:.95;
+  letter-spacing:-.035em;margin:0}
+.mark em{font-style:normal;color:var(--accent)}
+.tagline{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);margin:14px 0 0}
+.pwfield{margin-top:36px;position:relative}
+.pwfield label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+.pwfield input{width:100%;padding:15px 52px 15px 2px;font-size:19px;font-family:var(--mono);
+  background:none;border:0;border-bottom:1.5px solid var(--rule);color:var(--ink);
+  letter-spacing:.16em;border-radius:0}
+.pwfield input:focus{outline:none;border-bottom-color:var(--accent)}
+.peek{position:absolute;right:0;bottom:6px;width:var(--tap);height:var(--tap);background:none;
+  border:0;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted)}
+.pick{display:flex;flex-direction:column;gap:8px;margin-top:28px}
+.pick button{min-height:60px;padding:0 18px;border:1.5px solid var(--rule);background:var(--card);
+  border-radius:4px;font-size:19px;font-weight:500;text-align:left}
+.note{font-family:var(--mono);font-size:12px;color:var(--stall);margin-top:16px;min-height:18px}
+
+/* ---- header ---- */
+.mast{padding:calc(12px + var(--tg-top)) var(--pad) 0}
+.mast h1{font-size:27px;font-weight:700;letter-spacing:-.02em;margin:0;line-height:1.1}
+.mast-sub{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted);margin-top:5px}
+/* The cycle timeline: four blocks, the current month filled. */
+.timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:12px 0 0}
+.timeline div{height:5px;border-radius:2px;background:var(--sink)}
+.timeline div.past{background:var(--rule)}
+.timeline div.now{background:var(--accent)}
+.mast-rule{height:1px;background:var(--ink);margin:13px 0 0;opacity:.85}
+
+/* ---- goals ---- */
+.who-h{font-family:var(--mono);font-size:10px;letter-spacing:.17em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:baseline;gap:9px;margin:22px 0 2px;padding-top:12px;
+  border-top:1px solid var(--rule)}
+.who-h:first-child{margin-top:14px;border-top:0;padding-top:0}
+.who-h:after{content:"";flex:1;height:1px;background:var(--rule)}
+.goal{display:block;width:100%;padding:14px 0;border:0;border-bottom:1px solid var(--rule);
+  background:none;text-align:left}
+.goal:last-child{border-bottom:0}
+.g-top{display:flex;align-items:baseline;gap:10px}
+.g-title{flex:1 1 auto;min-width:0;font-size:18px;font-weight:600;line-height:1.25;
+  overflow-wrap:anywhere}
+.g-kind{flex:none;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);border:1px solid var(--rule);border-radius:3px;padding:2px 6px}
+.g-measure{font-size:13.5px;color:var(--muted);margin-top:5px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+/* The four-month ladder. One cell per month; this is the whole idea. */
+.ladder{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:11px}
+.cell{height:22px;border-radius:3px;background:var(--sink);display:grid;place-items:center;
+  font-family:var(--mono);font-size:9px;letter-spacing:.06em;color:var(--muted)}
+.cell.on_track{background:var(--on);color:#F3F5F7}
+.cell.slipping{background:var(--slip);color:#F3F5F7}
+.cell.stalled{background:var(--stall);color:#F3F5F7}
+.cell.done{background:var(--accent);color:#F3F5F7}
+.cell.now{box-shadow:inset 0 0 0 2px var(--ink)}
+.g-out{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+  margin-top:9px;color:var(--muted)}
+.empty{font-size:19px;color:var(--muted);text-align:center;padding:52px 10px;line-height:1.5}
+.hint-card{background:var(--card);border:1px solid var(--rule);border-radius:5px;padding:15px 16px;
+  margin:16px 0 4px;font-size:14px;color:var(--muted);line-height:1.5}
+.hint-card b{color:var(--ink);font-weight:600}
+
+/* ---- buttons ---- */
+.btn{flex:1;min-width:0;min-height:var(--tap);padding:0 12px;border:0;border-radius:4px;
+  background:var(--ink);color:var(--card);font-family:var(--mono);font-size:12px;
+  letter-spacing:.11em;text-transform:uppercase}
+.btn[disabled]{opacity:.4}
+.btn.ghost{background:none;border:1.5px solid var(--rule);color:var(--muted)}
+.btn.accent{background:var(--accent)}
+.btn.danger{background:none;border:1.5px solid var(--stall);color:var(--stall)}
+.btn.slim{flex:0 0 auto}
+
+/* ---- panel ---- */
+.panel{position:fixed;left:50%;transform:translateX(-50%);top:0;width:var(--app-w);max-width:100%;
+  height:var(--app-h);z-index:40;background:var(--ground);display:none;overflow-x:clip}
+.panel.open{display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.p-head{padding:calc(12px + var(--tg-top)) var(--pad) 12px;border-bottom:1px solid var(--rule);
+  display:flex;align-items:center;gap:12px}
+.p-head h2{font-size:20px;font-weight:600;margin:0;flex:1;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.icon{width:var(--tap);height:var(--tap);flex:none;border:0;background:none;font-size:21px;
+  display:grid;place-items:center;border-radius:4px}
+
+.step{padding:var(--pad) 0}
+.q{font-size:25px;font-weight:600;line-height:1.2;margin:0 0 6px;overflow-wrap:anywhere}
+.q-hint{font-family:var(--mono);font-size:11px;color:var(--muted);margin:0 0 20px;line-height:1.6}
+.field{margin-bottom:18px}
+.field>label,.legend{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+input[type=text],textarea{width:100%;min-height:var(--tap);padding:12px 13px;
+  border:1.5px solid var(--rule);background:var(--card);color:var(--ink);border-radius:4px;
+  font:inherit;font-size:16px}
+textarea{line-height:1.5;resize:vertical}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+fieldset{border:0;padding:0;margin:0}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;min-height:54px;border:1.5px solid var(--rule);background:var(--card);
+  color:var(--muted);border-radius:4px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  text-transform:uppercase;padding:6px 3px;display:grid;place-items:center;gap:3px}
+.seg button b{font-family:var(--sans);font-size:14px;font-weight:600;letter-spacing:0;
+  text-transform:none}
+.seg button[aria-checked="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.statuses{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.statuses button{min-height:54px;border:1.5px solid var(--rule);background:var(--card);
+  border-radius:4px;font-family:var(--mono);font-size:11px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted)}
+.statuses button[aria-pressed="true"]{color:var(--card);border-color:transparent}
+.hist{margin-top:6px}
+.hist-row{display:grid;grid-template-columns:4.5em auto 1fr;gap:10px;align-items:center;
+  padding:9px 0;border-bottom:1px dotted var(--rule);font-family:var(--mono);font-size:11px;
+  color:var(--muted)}
+.pill{width:11px;height:11px;border-radius:3px}
+.d-lab{font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--muted);margin:24px 0 6px}
+.d-val{font-size:16px;line-height:1.5;margin:0}
+.status{font-family:var(--mono);font-size:12px;margin-top:14px;min-height:18px;color:var(--stall)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="gate-mid">
+    <h1 class="mark">Four<br>M<em>o</em>nths</h1>
+    <p class="tagline" id="tagline">Goals we actually check</p>
+    <div id="gate-pw">
+      <div class="pwfield">
+        <label for="pw">Password</label>
+        <input type="password" id="pw" autocomplete="current-password" enterkeyhint="go"
+               autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button class="peek" id="peek" type="button" aria-pressed="false"
+                aria-label="Show password">Show</button>
+      </div>
+    </div>
+    <div class="pick" id="gate-who" hidden role="group" aria-label="Who are you?"></div>
+    <p class="note" id="gate-note" role="status" aria-live="polite"></p>
+  </div>
+  <div class="bar" id="gate-bar" style="border-top:0;padding-left:0;padding-right:0">
+    <button class="btn accent" id="pw-go">Open</button>
+  </div>
+</div>
+
+<div class="screen" id="app" hidden>
+  <header class="mast">
+    <h1 id="cycle-name">Four Months</h1>
+    <p class="mast-sub" id="cycle-sub"></p>
+    <div class="timeline" id="timeline" aria-hidden="true"></div>
+    <div class="mast-rule"></div>
+  </header>
+  <main class="scroll" id="board" tabindex="-1"></main>
+  <div class="bar" id="actions"></div>
+</div>
+
+<div class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="p-title">
+  <header class="p-head">
+    <button class="icon" id="p-back" aria-label="Close">&larr;</button>
+    <h2 id="p-title"></h2>
+  </header>
+  <div class="scroll" id="p-body"></div>
+  <div class="bar" id="p-bar"></div>
+</div>
+
+<script>
+"use strict";
+
+const KINDS = ["outcome","process","stop"];
+const KIND_LABEL = {outcome:"Outcome", process:"Process", stop:"Stop doing"};
+const KIND_HINT = {
+  outcome:"the result you want",
+  process:"the habit that gets you there",
+  stop:"something you're cutting"
+};
+const STATUSES = ["on_track","slipping","stalled","done"];
+const STATUS_LABEL = {on_track:"On track", slipping:"Slipping", stalled:"Stalled", done:"Done"};
+const STATUS_VAR = {on_track:"var(--on)", slipping:"var(--slip)", stalled:"var(--stall)",
+                    done:"var(--accent)"};
+const OUTCOMES = ["done","partial","dropped","missed"];
+const OUTCOME_LABEL = {done:"Done", partial:"Partly there", dropped:"Dropped on purpose",
+                       missed:"Missed"};
+const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const CAP = 3;
+
+let PW = localStorage.getItem("fm.pw") || "";
+let ME = Number(localStorage.getItem("fm.me")) || null;
+let D = null, lastFocus = null;
+
+const TG = window.Telegram?.WebApp?.initData ? window.Telegram.WebApp : null;
+if (TG) {
+  TG.ready(); TG.expand();
+  try { TG.setHeaderColor("#E3E7EB"); TG.setBackgroundColor("#E3E7EB"); } catch {}
+  try { TG.disableVerticalSwipes?.(); } catch {}
+  const insets = () => {
+    const r = document.documentElement;
+    const dev = TG.safeAreaInset || {}, chrome = TG.contentSafeAreaInset || {};
+    r.style.setProperty("--tg-top", ((dev.top||0)+(chrome.top||0))+"px");
+    r.style.setProperty("--tg-bottom", ((dev.bottom||0)+(chrome.bottom||0))+"px");
+    r.style.setProperty("--app-h", (TG.viewportStableHeight||window.innerHeight)+"px");
+  };
+  insets();
+  ["viewportChanged","safeAreaChanged","contentSafeAreaChanged"]
+    .forEach(e => { try { TG.onEvent(e, () => { insets(); pinWidth(); }); } catch {} });
+}
+
+function pinWidth() {
+  const c = [document.documentElement.clientWidth, window.innerWidth,
+             window.visualViewport?.width].filter(n => typeof n === "number" && n > 0);
+  if (c.length) document.documentElement.style.setProperty("--app-w", Math.floor(Math.min(...c))+"px");
+}
+pinWidth();
+window.addEventListener("resize", pinWidth);
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function api(action, payload = {}) {
+  const res = await fetch("/api", {
+    method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({action, password: PW, initData: TG?.initData, ...payload})
+  });
+  let out;
+  try { out = await res.json(); }
+  catch { throw new Error("The server didn't respond (" + res.status + ")."); }
+  if (!res.ok) throw new Error(out.error || "Something went wrong");
+  return out;
+}
+
+/* ================= gate ================= */
+
+$("peek").onclick = () => {
+  const on = $("pw").type === "password";
+  $("pw").type = on ? "text" : "password";
+  $("peek").textContent = on ? "Hide" : "Show";
+  $("peek").setAttribute("aria-pressed", String(on));
+};
+
+$("pw-go").onclick = async () => {
+  $("gate-note").textContent = "";
+  if (!$("pw").value) { $("gate-note").textContent = "Enter the password."; return; }
+  $("pw-go").disabled = true; $("pw-go").textContent = "Checking";
+  try {
+    PW = $("pw").value;
+    D = await api("state");
+    localStorage.setItem("fm.pw", PW);
+    (ME && D.people.some(p => p.id === ME)) ? start() : showWho();
+  } catch (e) { $("gate-note").textContent = e.message; $("pw").select(); }
+  finally { $("pw-go").disabled = false; $("pw-go").textContent = "Open"; }
+};
+$("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("pw-go").click(); });
+
+function showWho() {
+  $("gate-pw").hidden = true;
+  $("gate-bar").style.display = "none";
+  $("tagline").textContent = "Which one are you?";
+  const who = $("gate-who");
+  who.hidden = false;
+  who.innerHTML = D.people.length
+    ? D.people.map(p => '<button data-id="'+p.id+'">'+esc(p.name)+'</button>').join("")
+    : '<p class="note">Send the bot a message in Telegram first.</p>';
+  who.querySelectorAll("button").forEach(b => b.onclick = () => {
+    ME = Number(b.dataset.id); localStorage.setItem("fm.me", ME); start();
+  });
+}
+
+function start() { $("gate").hidden = true; $("app").hidden = false; render(); }
+
+/* ================= helpers ================= */
+
+const nameOf = id => id === null ? "Together"
+  : (D.people.find(p => p.id === id)?.name ?? "?");
+
+function cycleMonths() {
+  if (!D.cycle) return [];
+  const s = new Date(D.cycle.starts_on + "T00:00:00Z");
+  return [0,1,2,3].map(i => {
+    const d = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth() + i, 1));
+    return {key: d.toISOString().slice(0,10), label: MONTH_ABBR[d.getUTCMonth()]};
+  });
+}
+
+function monthIndex() {
+  const months = cycleMonths();
+  const i = months.findIndex(m => m.key === D.month);
+  return i === -1 ? (D.month > months[3]?.key ? 4 : 0) : i;
+}
+
+const daysLeft = () => D.cycle
+  ? Math.ceil((new Date(D.cycle.ends_on + "T23:59:59Z") - Date.now()) / 86400000) : 0;
+
+function ladder(g) {
+  const months = cycleMonths();
+  const now = monthIndex();
+  return '<div class="ladder" aria-hidden="true">' + months.map((m, i) => {
+    const hit = (g.checkins ?? []).find(c => c.month === m.key);
+    return '<div class="cell ' + (hit ? hit.status : "") + (i === now ? " now" : "") + '">'
+      + m.label + '</div>';
+  }).join("") + '</div>';
+}
+
+/* ================= main view ================= */
+
+function render() {
+  if (!D.cycle) return renderNoCycle();
+
+  const months = cycleMonths();
+  const now = monthIndex();
+  const left = daysLeft();
+
+  $("cycle-name").textContent = D.cycle.name;
+  $("cycle-sub").textContent = left > 0
+    ? "Month " + Math.min(4, now + 1) + " of 4 \u00b7 " + left + " days left"
+    : "Cycle is up \u00b7 time to review";
+  $("timeline").innerHTML = months.map((m, i) =>
+    '<div class="' + (i < now ? "past" : i === now ? "now" : "") + '"></div>').join("");
+
+  const groups = [[null, D.goals.filter(g => g.owner_id === null)]]
+    .concat(D.people.map(p => [p.id, D.goals.filter(g => g.owner_id === p.id)]));
+
+  let html = "";
+  if (!D.goals.length) {
+    html = '<div class="hint-card"><b>Three each, plus any you share.</b><br>'
+      + 'The cap is the point \u2014 five means none of them happen. Give every goal a line '
+      + 'saying how you\\u2019ll know, and one saying what will most likely stop it.</div>'
+      + '<p class="empty">No goals yet.</p>';
+  } else {
+    for (const [ownerId, list] of groups) {
+      if (!list.length) continue;
+      html += '<p class="who-h">' + esc(nameOf(ownerId))
+        + (ownerId !== null && ownerId !== ME ? " \u00b7 ask, don\\u2019t chase" : "") + '</p>';
+      html += list.map(goalHtml).join("");
+    }
+  }
+
+  $("board").innerHTML = html;
+  $("board").querySelectorAll("[data-goal]").forEach(b =>
+    b.onclick = () => openGoal(Number(b.dataset.goal)));
+
+  const reviewing = left <= 0;
+  $("actions").innerHTML =
+    (reviewing
+      ? '<button class="btn accent" id="review">Run the review</button>'
+      : '<button class="btn ghost" id="checkin">Check in</button>')
+    + '<button class="btn" id="add">+ Goal</button>';
+  $("add").onclick = () => openGoalForm(null);
+  if (reviewing) $("review").onclick = openReview;
+  else $("checkin").onclick = openCheckin;
+}
+
+function goalHtml(g) {
+  return '<button class="goal" data-goal="' + g.id + '" aria-label="' + esc(g.title) + '">'
+    + '<span class="g-top"><span class="g-title">' + esc(g.title) + '</span>'
+    + '<span class="g-kind">' + KIND_LABEL[g.kind] + '</span></span>'
+    + (g.measure ? '<span class="g-measure">' + esc(g.measure) + '</span>' : "")
+    + ladder(g)
+    + (g.outcome ? '<span class="g-out">' + OUTCOME_LABEL[g.outcome] + '</span>' : "")
+    + '</button>';
+}
+
+function renderNoCycle() {
+  $("cycle-name").textContent = "Four Months";
+  $("cycle-sub").textContent = "No cycle running";
+  $("timeline").innerHTML = "";
+  $("board").innerHTML =
+    '<div class="hint-card"><b>A cycle runs four months.</b><br>'
+    + 'Long enough for something real to happen, short enough that you remember what you '
+    + 'agreed. You get three tries a year instead of one, and each one starts with evidence '
+    + 'from the last.</div>'
+    + '<p class="empty">Start one to add goals.</p>';
+  $("actions").innerHTML = '<button class="btn accent" id="new">Start a cycle</button>';
+  $("new").onclick = async () => {
+    $("new").disabled = true;
+    try { await api("newCycle"); D = await api("state"); render(); }
+    catch (e) { alert(e.message); $("new").disabled = false; }
+  };
+}
+
+/* ================= panel ================= */
+
+function panelOpen(title, body, bar) {
+  lastFocus = lastFocus || document.activeElement;
+  $("p-title").textContent = title;
+  $("p-body").innerHTML = body;
+  $("p-bar").innerHTML = bar;
+  $("panel").classList.add("open");
+  $("p-body").scrollTop = 0;
+  ($("p-body").querySelector("input,button") || $("p-back")).focus();
+}
+function panelClose() {
+  $("panel").classList.remove("open");
+  if (lastFocus) { lastFocus.focus(); lastFocus = null; }
+}
+$("p-back").onclick = panelClose;
+document.addEventListener("keydown", e => {
+  if (!$("panel").classList.contains("open")) return;
+  if (e.key === "Escape") { e.preventDefault(); panelClose(); return; }
+  if (e.key !== "Tab") return;
+  const f = [...$("panel").querySelectorAll("button,input,textarea")]
+    .filter(el => el.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length-1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+/* ================= one goal ================= */
+
+function openGoal(id) {
+  const g = D.goals.find(x => x.id === id);
+  if (!g) return;
+  const mine = g.owner_id === null || g.owner_id === ME;
+  const months = cycleMonths();
+  const now = monthIndex();
+  const current = (g.checkins ?? []).find(c => c.month === D.month);
+
+  let body = '<div class="step">'
+    + '<h3 class="q">' + esc(g.title) + '</h3>'
+    + '<p class="q-hint">' + KIND_LABEL[g.kind] + " \u2014 " + KIND_HINT[g.kind]
+    + " \u00b7 " + esc(nameOf(g.owner_id)) + '</p>';
+
+  if (g.measure) body += '<p class="d-lab">How you\u2019ll know</p><p class="d-val">'
+    + esc(g.measure) + '</p>';
+  if (g.risk) body += '<p class="d-lab">What might stop it</p><p class="d-val">'
+    + esc(g.risk) + '</p>';
+
+  body += '<p class="d-lab">Where it\u2019s been</p><div class="hist">'
+    + months.map((m, i) => {
+        const hit = (g.checkins ?? []).find(c => c.month === m.key);
+        return '<div class="hist-row"><span>' + m.label + '</span>'
+          + '<span class="pill" style="background:' + (hit ? STATUS_VAR[hit.status] : "var(--sink)")
+          + '"></span><span>' + (hit ? STATUS_LABEL[hit.status]
+              : (i > now ? "not yet" : "no check-in")) + '</span></div>';
+      }).join("") + '</div>';
+
+  if (mine && daysLeft() > 0) {
+    body += '<p class="d-lab">This month</p><div class="statuses" id="g-status">'
+      + STATUSES.map(s => '<button data-s="' + s + '" aria-pressed="'
+          + (current?.status === s) + '"' + (current?.status === s
+            ? ' style="background:' + STATUS_VAR[s] + '"' : "")
+          + '>' + STATUS_LABEL[s] + '</button>').join("")
+      + '</div><p class="status" id="g-msg" role="status" aria-live="polite"></p>';
+  } else if (!mine) {
+    body += '<p class="d-lab">Not yours to update</p>'
+      + '<p class="d-val" style="color:var(--muted)">This one\u2019s '
+      + esc(nameOf(g.owner_id)) + '\u2019s. Ask how it\u2019s going \u2014 that\u2019s the job.</p>';
+  }
+
+  body += '</div>';
+
+  panelClose();
+  panelOpen(g.title, body,
+    (mine ? '<button class="btn ghost slim" id="g-del">Delete</button>' : "")
+    + '<button class="btn" id="g-edit">Edit</button>');
+
+  if (mine) {
+    $("g-status").querySelectorAll("button").forEach(b => b.onclick = async () => {
+      const s = b.dataset.s;
+      $("g-msg").style.color = "var(--muted)";
+      $("g-msg").textContent = "Saving\u2026";
+      try {
+        await api("checkin", {id: g.id, status: s});
+        D = await api("state");
+        openGoal(g.id);
+        render();
+      } catch (e) { $("g-msg").style.color = "var(--stall)"; $("g-msg").textContent = e.message; }
+    });
+    $("g-del").onclick = async () => {
+      if (!confirm("Delete \u201c" + g.title + "\u201d?")) return;
+      await api("goalDrop", {id: g.id});
+      D = await api("state"); panelClose(); render();
+    };
+  }
+  $("g-edit").onclick = () => openGoalForm(g);
+}
+
+/* ================= add / edit ================= */
+
+function openGoalForm(g) {
+  let kind = g?.kind ?? "outcome";
+  let owner = g ? g.owner_id : ME;
+
+  panelClose();
+  panelOpen(g ? "Edit" : "New goal",
+    '<div class="step">'
+    + '<div class="field"><label for="f-title">The goal</label>'
+    + '<input type="text" id="f-title" value="' + esc(g?.title ?? "") + '" autocapitalize="sentences"'
+    + ' placeholder="Run a sub-55 10k"></div>'
+    + '<fieldset class="field"><legend class="legend">Whose</legend>'
+    + '<div class="seg" role="radiogroup" aria-label="Whose" id="f-owner">'
+    + '<button role="radio" data-o="me" aria-checked="' + (owner === ME) + '"><b>Mine</b></button>'
+    + '<button role="radio" data-o="shared" aria-checked="' + (owner === null) + '"><b>Shared</b></button>'
+    + '</div></fieldset>'
+    + '<fieldset class="field"><legend class="legend">Type</legend>'
+    + '<div class="seg" role="radiogroup" aria-label="Type" id="f-kind">'
+    + KINDS.map(k => '<button role="radio" data-k="' + k + '" aria-checked="' + (k === kind) + '">'
+        + '<b>' + KIND_LABEL[k] + '</b>' + KIND_HINT[k] + '</button>').join("")
+    + '</div></fieldset>'
+    + '<div class="field"><label for="f-measure">How will you know?</label>'
+    + '<textarea id="f-measure" rows="2" placeholder="Three runs a week, logged">'
+    + esc(g?.measure ?? "") + '</textarea>'
+    + '<p class="q-hint" style="margin:7px 0 0">If you can\u2019t answer it yes or no in four '
+    + 'months, it\u2019s a wish.</p></div>'
+    + '<div class="field"><label for="f-risk">What will most likely stop it?</label>'
+    + '<textarea id="f-risk" rows="2" placeholder="Work trips in November">'
+    + esc(g?.risk ?? "") + '</textarea>'
+    + '<p class="q-hint" style="margin:7px 0 0">You\u2019ll compare this against what actually '
+    + 'happened at the review. It\u2019s the useful half.</p></div>'
+    + '<p class="status" id="f-msg" role="status" aria-live="polite"></p></div>',
+    '<button class="btn ghost" id="f-cancel">Cancel</button>'
+    + '<button class="btn accent" id="f-save">Save</button>');
+
+  $("f-owner").querySelectorAll("button").forEach(b => b.onclick = () => {
+    owner = b.dataset.o === "shared" ? null : ME;
+    $("f-owner").querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-checked", String(x === b)));
+  });
+  $("f-kind").querySelectorAll("button").forEach(b => b.onclick = () => {
+    kind = b.dataset.k;
+    $("f-kind").querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-checked", String(x === b)));
+  });
+
+  $("f-cancel").onclick = panelClose;
+  $("f-save").onclick = async () => {
+    const msg = $("f-msg");
+    const title = $("f-title").value.trim();
+    if (!title) { msg.style.color = "var(--stall)"; msg.textContent = "Give it a title."; return; }
+    $("f-save").disabled = true;
+    msg.style.color = "var(--muted)"; msg.textContent = "Saving\u2026";
+    const payload = {
+      title, kind, owner_id: owner,
+      measure: $("f-measure").value.trim() || null,
+      risk: $("f-risk").value.trim() || null,
+    };
+    try {
+      if (g) await api("goalUpdate", {id: g.id, ...payload});
+      else await api("goalAdd", payload);
+      D = await api("state");
+      panelClose(); render();
+    } catch (e) {
+      msg.style.color = "var(--stall)"; msg.textContent = e.message;
+      $("f-save").disabled = false;
+    }
+  };
+}
+
+/* ================= check-in ================= */
+
+function openCheckin() {
+  const mine = D.goals.filter(g => g.owner_id === null || g.owner_id === ME);
+  if (!mine.length) { alert("Nothing to check in on yet."); return; }
+  const now = monthIndex();
+  const midpoint = now === 2;
+
+  let body = '<div class="step">'
+    + '<h3 class="q">' + (midpoint ? "Halfway" : "This month") + '</h3>'
+    + '<p class="q-hint">' + (midpoint
+        ? "Different question this month: is each of these still worth doing? Dropping one on "
+          + "purpose is a good outcome. Letting it rot isn\u2019t."
+        : "Ten minutes. What moved, what didn\u2019t, what changes.") + '</p>';
+
+  for (const g of mine) {
+    const cur = (g.checkins ?? []).find(c => c.month === D.month);
+    body += '<div class="field"><label>' + esc(g.title) + '</label>'
+      + '<div class="statuses" data-goal="' + g.id + '">'
+      + STATUSES.map(s => '<button data-s="' + s + '" aria-pressed="' + (cur?.status === s) + '"'
+          + (cur?.status === s ? ' style="background:' + STATUS_VAR[s] + '"' : "")
+          + '>' + STATUS_LABEL[s] + '</button>').join("")
+      + '</div></div>';
+  }
+  body += '<p class="status" id="c-msg" role="status" aria-live="polite"></p></div>';
+
+  panelClose();
+  panelOpen("Check-in", body, '<button class="btn accent" id="c-done">Done</button>');
+
+  $("p-body").querySelectorAll("[data-goal]").forEach(row => {
+    row.querySelectorAll("button").forEach(b => b.onclick = async () => {
+      try {
+        await api("checkin", {id: Number(row.dataset.goal), status: b.dataset.s});
+        row.querySelectorAll("button").forEach(x => {
+          const on = x === b;
+          x.setAttribute("aria-pressed", String(on));
+          x.style.background = on ? STATUS_VAR[b.dataset.s] : "";
+        });
+        $("c-msg").style.color = "var(--muted)";
+        $("c-msg").textContent = "Saved.";
+      } catch (e) { $("c-msg").style.color = "var(--stall)"; $("c-msg").textContent = e.message; }
+    });
+  });
+  $("c-done").onclick = async () => { D = await api("state"); panelClose(); render(); };
+}
+
+/* ================= review ================= */
+
+function openReview() {
+  let body = '<div class="step">'
+    + '<h3 class="q">' + esc(D.cycle.name) + ' is up</h3>'
+    + '<p class="q-hint">Go through these together, one goal at a time.<br><br>'
+    + '1. Did it happen?<br>'
+    + '2. If not \u2014 was the goal wrong, or did you just not do it?<br>'
+    + '3. You wrote down what would stop each one. Was that what actually stopped it?<br>'
+    + '4. What carries over, and what are you letting go?</p>';
+
+  for (const g of D.goals) {
+    body += '<div class="field"><label>' + esc(g.title) + '</label>'
+      + (g.risk ? '<p class="q-hint" style="margin:0 0 8px">You predicted: ' + esc(g.risk) + '</p>' : "")
+      + '<div class="statuses" data-rv="' + g.id + '">'
+      + OUTCOMES.map(o => '<button data-o="' + o + '" aria-pressed="' + (g.outcome === o) + '"'
+          + (g.outcome === o ? ' style="background:var(--accent)"' : "")
+          + '>' + OUTCOME_LABEL[o] + '</button>').join("")
+      + '</div></div>';
+  }
+  body += '<p class="status" id="r-msg" role="status" aria-live="polite"></p></div>';
+
+  panelClose();
+  panelOpen("Review", body,
+    '<button class="btn ghost" id="r-later">Later</button>'
+    + '<button class="btn accent" id="r-close">Close &amp; start next</button>');
+
+  $("p-body").querySelectorAll("[data-rv]").forEach(row => {
+    row.querySelectorAll("button").forEach(b => b.onclick = async () => {
+      try {
+        await api("goalUpdate", {id: Number(row.dataset.rv), outcome: b.dataset.o});
+        row.querySelectorAll("button").forEach(x => {
+          const on = x === b;
+          x.setAttribute("aria-pressed", String(on));
+          x.style.background = on ? "var(--accent)" : "";
+        });
+      } catch (e) { $("r-msg").style.color = "var(--stall)"; $("r-msg").textContent = e.message; }
+    });
+  });
+
+  $("r-later").onclick = async () => { D = await api("state"); panelClose(); render(); };
+  $("r-close").onclick = async () => {
+    $("r-close").disabled = true;
+    try {
+      await api("closeCycle");
+      D = await api("state");
+      panelClose(); render();
+    } catch (e) {
+      $("r-msg").style.color = "var(--stall)";
+      $("r-msg").textContent = e.message;
+      $("r-close").disabled = false;
+    }
+  };
+}
+
+/* ================= boot ================= */
+
+(async () => {
+  if (TG) {
+    try {
+      const who = await api("whoami");
+      if (who.verified) { ME = who.me; D = await api("state"); start(); return; }
+    } catch {}
+  }
+  if (!PW) { $("pw").focus(); return; }
+  try {
+    D = await api("state");
+    (ME && D.people.some(p => p.id === ME)) ? start() : showWho();
+  } catch { localStorage.removeItem("fm.pw"); $("pw").focus(); }
+})();
+</script>
+</body>
+</html>
