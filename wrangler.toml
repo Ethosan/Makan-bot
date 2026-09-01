@@ -1,7 +1,11 @@
 name = "makan-bot"
-main = "index.ts"
+main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # Secrets — set these with `wrangler secret put <NAME>`, never commit them:
 #   BOT_TOKEN, WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_KEY
+
+# The monthly goal check-in: 9am Singapore on the 1st.
+[triggers]
+crons = ["0 1 1 * *"]
