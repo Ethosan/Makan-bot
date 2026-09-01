@@ -29,6 +29,42 @@ import { escapeHtml, refreshBoard, renderBoard, revealText } from "./leaderboard
 import { combinedScore, fmt } from "./scoring";
 import { mirrorToStorage } from "./photos";
 import {
+  GOAL_CAP,
+  addGoal,
+  carryDepth,
+  currentCycle,
+  dropGoal,
+  goalById,
+  goalsOf,
+  latestStatus,
+  monthOf,
+  setCheckin,
+  startCycle,
+  type GoalKind,
+  type Outcome,
+  type Status,
+} from "./goals";
+import {
+  checkinList,
+  cycleCard,
+  outcomeKeyboard,
+  reviewPrompt,
+  statusPrompt,
+} from "./goalcards";
+import {
+  KIND_EMOJI,
+  KIND_LABEL,
+  addPlan,
+  addPlanPhoto,
+  dropPlan,
+  guessKind,
+  parseDate,
+  parseTimeText,
+  planById,
+  plans,
+  type PlanKind,
+} from "./plans";
+import {
   addWant,
   dropWant,
   parseWantLine,
@@ -87,6 +123,24 @@ Most of the time you'll want the app \u2014 <b>/site</b> opens it, and everythin
 <b>/board</b> \u2014 print the leaderboard
 <b>/when <i>name</i> 2025-12-02</b> \u2014 set a date you skipped
 <b>/remove <i>name</i></b> \u2014 delete an entry
+
+<b><u>Bookings</u></b>
+<b>/book <i>name</i> | 12 Sep 7.30pm | 2 pax</b> \u2014 or forward the confirmation and reply to it with <code>/book <i>name</i></code>
+<b>/bookings</b> \u2014 what's coming up
+<b>/unbook <i>id</i></b> \u2014 cancel one
+<i>I'll nudge the day before and a few hours ahead, then ask how it was.</i>
+
+<b><u>Four-month goals</u></b>
+<b>/cycle</b> \u2014 the current cycle and where everything stands
+<b>/newcycle</b> \u2014 start a four-month cycle
+<b>/goal <i>title</i> | <i>how you'll know</i> | <i>what might stop it</i></b> \u2014 <code>shared</code> first for a joint one
+<b>/checkin</b> \u2014 update where each goal is
+<b>/review</b> \u2014 the end-of-cycle questions
+<b>/close</b> \u2014 grade it and open the next one
+
+<b><u>Upcoming</u></b>
+<b>/plan <i>title</i> | 12 Sep | 7.30pm</b> \u2014 or reply to a screenshot with <code>/plan <i>title</i></code> and I'll read the date off it and keep the image
+<b>/plan list</b> \u2014 everything planned
 
 <b><u>Places you want to go</u></b>
 <b>/want <i>name</i></b> \u2014 add one, or paste a whole list under the command, one per line. <code>| cheap</code> on the end tags the tier; anything in (brackets) becomes a note.
@@ -783,6 +837,326 @@ export function createBot(env: Env): Bot {
       parse_mode: "HTML",
     });
     return ctx.answerCallbackQuery();
+  });
+
+  /* ---------------- upcoming ---------------- */
+
+  bot.command(["plan", "upcoming"], async (ctx) => {
+    const args = (ctx.match as string)?.trim() ?? "";
+    const replied = ctx.message?.reply_to_message as any;
+    const from = replied ? (replied.text ?? replied.caption ?? "") : "";
+
+    if (!args && !from) {
+      return reply(
+        ctx,
+        [
+          "Usage: <code>/plan Odette | 12 Sep | 7.30pm</code>",
+          "",
+          "<i>Or reply to a screenshot you've already sent with</i> <code>/plan Odette</code><i> \u2014 I'll read the date off it and keep the image.</i>",
+          "",
+          "<code>/upcoming list</code> for everything planned.",
+        ].join("\n")
+      );
+    }
+
+    if (args.toLowerCase() === "list") {
+      const list = await plans(sb, ctx.chat.id);
+      if (!list.length) return reply(ctx, "Nothing planned yet.");
+      return reply(
+        ctx,
+        ["\u{1F5D3}\uFE0F <b>UPCOMING</b>", "", ...list.map((p) => {
+          const when = p.on_date
+            ? `${p.on_date}${p.at_time ? ` \u00b7 ${p.at_time}` : ""}`
+            : p.when_text ?? "date TBC";
+          return `${KIND_EMOJI[p.kind]} <b>${escapeHtml(p.title)}</b>\n<i>${escapeHtml(when)}</i>` +
+            (p.photos.length ? ` \u00b7 ${p.photos.length} \u{1F4CE}` : "");
+        })].join("\n\n")
+      );
+    }
+
+    const parts = args.split("|").map((x) => x.trim()).filter(Boolean);
+    const title = parts[0] || "Untitled";
+    const rest = parts.slice(1).join(" ");
+
+    // The typed args win; anything missing gets read off the screenshot.
+    const onDate = parseDate(rest) ?? (from ? parseDate(from) : null);
+    const atTime = parseTimeText(rest) ?? (from ? parseTimeText(from) : null);
+    const kind: PlanKind = guessKind(`${title} ${rest} ${from}`);
+
+    const plan = await addPlan(sb, {
+      chat_id: ctx.chat.id,
+      title,
+      kind,
+      on_date: onDate,
+      at_time: atTime,
+      // Unparseable dates aren't an error \u2014 they're the normal early state.
+      when_text: onDate ? null : rest || null,
+      is_food: kind === "booking",
+    });
+    if (!plan) return reply(ctx, "Couldn't save that.");
+
+    // Keep the screenshot with the plan, so it's findable later.
+    let attached = 0;
+    const photo = replied?.photo?.[replied.photo.length - 1];
+    if (photo) {
+      const url = await mirrorToStorage(sb, env, photo.file_id, plan.id);
+      if (url) { await addPlanPhoto(sb, plan.id, url); attached = 1; }
+    }
+
+    const when = onDate
+      ? `${onDate}${atTime ? ` \u00b7 ${atTime}` : ""}`
+      : plan.when_text ?? "date TBC";
+    return ctx.reply(
+      [
+        `${KIND_EMOJI[kind]} <b>${escapeHtml(title)}</b>`,
+        `<i>${escapeHtml(when)}</i> \u00b7 ${KIND_LABEL[kind]}`,
+        attached ? "\n<i>Screenshot saved with it.</i>" : "",
+        !onDate ? "\n<i>No date yet \u2014 add one in the app when you know.</i>" : "",
+      ].filter(Boolean).join("\n"),
+      {
+        parse_mode: "HTML",
+        message_thread_id: ctx.message?.message_thread_id,
+        reply_markup: new InlineKeyboard().text("\u2715 Remove", `pl:drop:${plan.id}`),
+      }
+    );
+  });
+
+  bot.callbackQuery(/^pl:drop:(\d+)$/, async (ctx) => {
+    const plan = await planById(sb, Number(ctx.match![1]));
+    if (!plan) return ctx.answerCallbackQuery({ text: "Already gone." });
+    await dropPlan(sb, plan.id);
+    await ctx.editMessageText(`Removed <b>${escapeHtml(plan.title)}</b>.`, { parse_mode: "HTML" });
+    return ctx.answerCallbackQuery();
+  });
+
+  /* ---------------- four-month goals ---------------- */
+
+  bot.command(["cycle", "goals"], async (ctx) => {
+    const cycle = await currentCycle(sb, ctx.chat.id);
+    if (!cycle) {
+      return reply(
+        ctx,
+        "No cycle running. <code>/newcycle</code> starts a four-month one from this month."
+      );
+    }
+    const goals = await goalsOf(sb, cycle.id);
+    const names = await peopleMap(sb);
+    return reply(ctx, cycleCard(cycle, goals, names));
+  });
+
+  bot.command("newcycle", async (ctx) => {
+    const existing = await currentCycle(sb, ctx.chat.id);
+    if (existing) {
+      return reply(
+        ctx,
+        `<b>${escapeHtml(existing.name)}</b> is still running \u2014 <code>/close</code> it first.`
+      );
+    }
+    const cycle = await startCycle(sb, ctx.chat.id);
+    if (!cycle) return reply(ctx, "Couldn't start a cycle.");
+    return reply(
+      ctx,
+      [
+        `\u{1F3AF} <b>${escapeHtml(cycle.name)}</b> is open.`,
+        `<i>${cycle.starts_on} to ${cycle.ends_on}</i>`,
+        "",
+        `${GOAL_CAP} goals each, plus any you share. Add them with:`,
+        "<code>/goal Run a sub-55 10k | three runs a week by Dec | outcome</code>",
+        "<code>/goal shared Cook at home 4 nights a week</code>",
+        "",
+        "<i>I'll ask for a check-in on the 1st of each month.</i>",
+      ].join("\n")
+    );
+  });
+
+  bot.command("goal", async (ctx) => {
+    const cycle = await currentCycle(sb, ctx.chat.id);
+    if (!cycle) return reply(ctx, "No cycle running. <code>/newcycle</code> first.");
+
+    let args = (ctx.match as string)?.trim() ?? "";
+    if (!args) {
+      return reply(
+        ctx,
+        [
+          "<code>/goal <i>title</i> | <i>how you'll know</i> | <i>what might stop it</i></code>",
+          "",
+          "Put <code>shared</code> first for one you both own.",
+          "Add <code>process</code> or <code>stop</code> at the end to mark the type \u2014 default is an outcome.",
+        ].join("\n")
+      );
+    }
+
+    let ownerId: number | null = ctx.from!.id;
+    if (/^shared\b/i.test(args)) {
+      ownerId = null;
+      args = args.replace(/^shared\b[:\s]*/i, "");
+    }
+
+    let kind: GoalKind = "outcome";
+    if (/\bprocess\s*$/i.test(args)) { kind = "process"; args = args.replace(/\|?\s*process\s*$/i, ""); }
+    else if (/\bstop\s*$/i.test(args)) { kind = "stop"; args = args.replace(/\|?\s*stop\s*$/i, ""); }
+
+    const [title, measure, risk] = args.split("|").map((x) => x.trim());
+    if (!title) return reply(ctx, "Needs a title.");
+
+    const existing = await goalsOf(sb, cycle.id);
+    const mine = existing.filter((g) => g.owner_id === ownerId);
+    if (mine.length >= GOAL_CAP) {
+      return reply(
+        ctx,
+        `That's already ${GOAL_CAP} ${ownerId === null ? "shared goals" : "goals"} for this cycle.\n` +
+          "<i>The cap is the point \u2014 drop one first with</i> <code>/dropgoal</code><i>.</i>"
+      );
+    }
+
+    const goal = await addGoal(sb, {
+      cycle_id: cycle.id,
+      chat_id: ctx.chat.id,
+      owner_id: ownerId,
+      title,
+      kind,
+      measure: measure || null,
+      risk: risk || null,
+    });
+    if (!goal) return reply(ctx, "Couldn't save that.");
+
+    const warn = !measure
+      ? "\n\n<i>No measure set. If you can't answer it yes or no in four months, it's a wish \u2014 add one by editing in the app.</i>"
+      : !risk
+        ? "\n\n<i>Worth adding what might stop it \u2014 that line is the useful half at review.</i>"
+        : "";
+
+    return reply(
+      ctx,
+      `Added <b>${escapeHtml(title)}</b>${ownerId === null ? " <i>(shared)</i>" : ""}.` + warn
+    );
+  });
+
+  bot.command("dropgoal", async (ctx) => {
+    const cycle = await currentCycle(sb, ctx.chat.id);
+    if (!cycle) return reply(ctx, "No cycle running.");
+    const goals = await goalsOf(sb, cycle.id);
+    const ref = (ctx.match as string)?.trim().toLowerCase();
+    const goal = goals.find((g) => g.title.toLowerCase().includes(ref ?? "\u0000"));
+    if (!ref || !goal) {
+      return reply(
+        ctx,
+        ["Usage: <code>/dropgoal <i>part of the title</i></code>", "", ...goals.map((g) => `\u2022 ${escapeHtml(g.title)}`)].join("\n")
+      );
+    }
+    await dropGoal(sb, goal.id);
+    return reply(ctx, `Dropped <b>${escapeHtml(goal.title)}</b>.`);
+  });
+
+  bot.command("checkin", async (ctx) => {
+    const cycle = await currentCycle(sb, ctx.chat.id);
+    if (!cycle) return reply(ctx, "No cycle running.");
+    const goals = await goalsOf(sb, cycle.id);
+    if (!goals.length) return reply(ctx, "No goals to check in on yet.");
+    const names = await peopleMap(sb);
+    const { text, keyboard } = checkinList(goals, names);
+    return ctx.reply(text, {
+      parse_mode: "HTML",
+      message_thread_id: ctx.message?.message_thread_id,
+      reply_markup: keyboard,
+    });
+  });
+
+  bot.callbackQuery(/^ci:pick:(\d+)$/, async (ctx) => {
+    const goal = await goalById(sb, Number(ctx.match![1]));
+    if (!goal) return ctx.answerCallbackQuery({ text: "Gone." });
+    const { text, keyboard } = statusPrompt(goal);
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+    return ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(/^ci:set:(\d+):(on_track|slipping|stalled|done)$/, async (ctx) => {
+    const goalId = Number(ctx.match![1]);
+    await setCheckin(sb, goalId, ctx.match![2] as Status, ctx.from.id);
+    const goal = await goalById(sb, goalId);
+    if (!goal) return ctx.answerCallbackQuery();
+
+    const cycle = await currentCycle(sb, ctx.chat!.id);
+    const goals = cycle ? await goalsOf(sb, cycle.id) : [];
+    const names = await peopleMap(sb);
+    const { text, keyboard } = checkinList(goals, names);
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+
+    // A goal carried through several cycles is worth naming out loud.
+    const depth = await carryDepth(sb, goal);
+    if (depth >= 2) {
+      await ctx.reply(
+        `<i>${escapeHtml(goal.title)} has carried through ${depth} cycles now. ` +
+          "Worth asking whether it's actually a goal.</i>",
+        { parse_mode: "HTML", message_thread_id: ctx.callbackQuery.message?.message_thread_id }
+      );
+    }
+    return ctx.answerCallbackQuery({ text: "Noted." });
+  });
+
+  bot.callbackQuery("ci:back", async (ctx) => {
+    const cycle = await currentCycle(sb, ctx.chat!.id);
+    const goals = cycle ? await goalsOf(sb, cycle.id) : [];
+    const names = await peopleMap(sb);
+    const { text, keyboard } = checkinList(goals, names);
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+    return ctx.answerCallbackQuery();
+  });
+
+  bot.command("review", async (ctx) => {
+    const cycle = await currentCycle(sb, ctx.chat.id);
+    if (!cycle) return reply(ctx, "No cycle running.");
+    const goals = await goalsOf(sb, cycle.id);
+    await reply(ctx, reviewPrompt(cycle, goals));
+    for (const g of goals.filter((x) => !x.outcome)) {
+      await ctx.reply(
+        `<b>${escapeHtml(g.title)}</b>` + (g.measure ? `\n<i>${escapeHtml(g.measure)}</i>` : ""),
+        {
+          parse_mode: "HTML",
+          message_thread_id: ctx.message?.message_thread_id,
+          reply_markup: outcomeKeyboard(g),
+        }
+      );
+    }
+  });
+
+  bot.callbackQuery(/^rv:(done|partial|dropped|missed):(\d+)$/, async (ctx) => {
+    const outcome = ctx.match![1] as Outcome;
+    const goal = await goalById(sb, Number(ctx.match![2]));
+    if (!goal) return ctx.answerCallbackQuery({ text: "Gone." });
+    await sb.from("goals").update({ outcome }).eq("id", goal.id);
+    const label = { done: "\u2705 Done", partial: "\u{1F7E1} Partly there",
+                    dropped: "\u{1F5D1}\uFE0F Dropped on purpose", missed: "\u274C Missed" }[outcome];
+    await ctx.editMessageText(`<b>${escapeHtml(goal.title)}</b>\n${label}`, { parse_mode: "HTML" });
+    return ctx.answerCallbackQuery();
+  });
+
+  bot.command("close", async (ctx) => {
+    const cycle = await currentCycle(sb, ctx.chat.id);
+    if (!cycle) return reply(ctx, "No cycle running.");
+    const goals = await goalsOf(sb, cycle.id);
+    const unset = goals.filter((g) => !g.outcome);
+    if (unset.length) {
+      return reply(
+        ctx,
+        `Still ungraded: ${unset.map((g) => escapeHtml(g.title)).join(", ")}.\n` +
+          "<i>Run /review first \u2014 the grading is the point.</i>"
+      );
+    }
+    await sb.from("cycles").update({ closed: true }).eq("id", cycle.id);
+    const next = await startCycle(sb, ctx.chat.id);
+    const carry = goals.filter((g) => g.outcome === "partial");
+    return reply(
+      ctx,
+      [
+        `<b>${escapeHtml(cycle.name)}</b> closed.`,
+        next ? `\n\u{1F3AF} <b>${escapeHtml(next.name)}</b> is open.` : "",
+        carry.length
+          ? `\n<i>Partly done last time: ${carry.map((g) => escapeHtml(g.title)).join(", ")}. ` +
+            "Carry them over with /goal if they're still worth it.</i>"
+          : "",
+      ].filter(Boolean).join("\n")
+    );
   });
 
   /* ---------------- batch fast paths ---------------- */
