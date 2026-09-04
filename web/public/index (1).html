@@ -1,0 +1,1577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="theme-color" content="#DCE0D5">
+<title>The List</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Karla:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Contrast checked against the sage ground: muted 5.18:1, brass 4.50:1,
+   spark 5.81:1, both person colours above 6:1. All clear AA. */
+:root{
+  --paper:#DCE0D5; --card:#F1F3EB; --sink:#D0D5C8;
+  --ink:#191E19; --muted:#545C51; --rule:#B4BBA9;
+  --brass:#7A5F1C; --spark:#92321C;
+  --p1:#245645; --p2:#5F3669;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --serif:"Instrument Serif",Georgia,serif;
+  --pad:clamp(18px,5.5vw,28px);
+  --tap:46px;
+  /* Overridden inside Telegram, where env() reads as zero. */
+  --app-h:100dvh;
+  --app-w:100%;
+  --tg-top:env(safe-area-inset-top);
+  --tg-bottom:env(safe-area-inset-bottom);
+}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%;width:100%;max-width:100%;margin:0;overflow:hidden;overflow-x:clip}
+body{background:var(--paper);color:var(--ink);
+  font-family:"Karla",system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button{font-family:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2.5px solid var(--brass);outline-offset:2px;border-radius:2px}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ============ shell: page never scrolls, only the list ============ */
+.screen{height:var(--app-h);width:var(--app-w);max-width:100%;margin:0 auto;overflow-x:clip;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.scroll{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;padding:0 var(--pad)}
+/* A few px of slack so nothing can ever touch the edge, even if a font
+   measures slightly wider than expected. */
+#board{padding-right:calc(var(--pad) + 6px)}
+.bar{padding:12px var(--pad) calc(14px + var(--tg-bottom));
+  border-top:1px solid var(--rule);background:var(--paper);display:flex;gap:9px}
+
+/* ============ gate ============ */
+.gate{height:var(--app-h);width:var(--app-w);max-width:100%;margin:0 auto;display:grid;grid-template-rows:1fr auto;
+  padding:calc(var(--pad) + var(--tg-top)) var(--pad) calc(var(--pad) + var(--tg-bottom))}
+.gate-mid{display:flex;flex-direction:column;justify-content:center;min-height:0}
+.mark{font-family:var(--serif);font-weight:400;font-size:clamp(56px,19vw,96px);
+  line-height:.86;letter-spacing:-.025em;margin:0}
+.mark em{font-style:italic;color:var(--brass)}
+.tagline{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);margin:14px 0 0}
+.pwfield{margin-top:38px;position:relative}
+.pwfield label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+.pwfield input{width:100%;padding:15px 52px 15px 2px;font-size:19px;font-family:var(--mono);
+  background:none;border:0;border-bottom:1.5px solid var(--rule);color:var(--ink);
+  letter-spacing:.16em;border-radius:0}
+.pwfield input:focus{outline:none;border-bottom-color:var(--ink)}
+.peek{position:absolute;right:0;bottom:6px;width:var(--tap);height:var(--tap);
+  background:none;border:0;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted)}
+.pick{display:flex;flex-direction:column;gap:9px;margin-top:30px}
+.pick button{min-height:62px;padding:0 18px;border:1.5px solid var(--rule);background:var(--card);
+  border-radius:4px;font-family:var(--serif);font-size:25px;text-align:left;
+  display:flex;align-items:center;gap:13px}
+.pick button:hover{border-color:var(--ink)}
+.note{font-family:var(--mono);font-size:12px;color:var(--spark);margin-top:16px;min-height:18px}
+
+/* ============ masthead ============ */
+.mast{padding:calc(12px + var(--tg-top)) var(--pad) 0;overflow:hidden}
+.mast-row{border-bottom:2px solid var(--ink);padding-bottom:8px;overflow:hidden}
+.mast-row h1{font-family:var(--serif);font-weight:400;font-size:32px;line-height:1;margin:0;
+  white-space:nowrap}
+/* Own line, wrapping. A title-and-names row is the one pair guaranteed to be
+   too wide on a narrow phone. */
+.key{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.who.me{color:var(--ink);font-weight:500}
+.swatch{width:8px;height:8px;border-radius:50%;display:inline-block;vertical-align:middle;
+  margin-right:5px;flex:none}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 0}
+.modes button{min-height:38px;padding:0 10px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.09em;text-transform:uppercase;border:1px solid var(--rule);background:none;
+  color:var(--muted);border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.modes button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+/* Wraps to a second line on narrow phones rather than scrolling sideways. */
+.filters{display:flex;flex-wrap:wrap;gap:6px;padding:9px 0 11px}
+.filters button{min-height:34px;padding:0 11px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.07em;text-transform:uppercase;border:1px solid var(--rule);background:none;
+  color:var(--muted);border-radius:999px;white-space:nowrap}
+.filters button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.filters[hidden]{display:none}
+
+/* ============ list row ============ */
+/* Two columns only. Everything textual lives in one shrinkable box, and the
+   score is an explicit flex:none so it can never be the thing that gets cut. */
+.row{display:grid;grid-template-columns:56px minmax(0,1fr);gap:0 12px;align-items:center;
+  width:100%;padding:13px 0;border:0;border-bottom:1px solid var(--rule);background:none;
+  text-align:left;min-height:82px}
+.row:last-child{border-bottom:0}
+.r-body{min-width:0}
+.r-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.r-rank{flex:none;font-family:var(--serif);font-size:19px;line-height:1;color:var(--brass)}
+.r-rank.plain{color:var(--rule)}
+.r-name{flex:1 1 auto;min-width:0;font-family:var(--serif);font-size:20px;line-height:1.2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-score{flex:none;margin-left:auto;padding-left:4px;font-family:var(--mono);font-size:16px;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.r-thumb{width:56px;height:56px;border-radius:3px;background:var(--sink);object-fit:cover;
+  display:block}
+.r-thumb.none{display:grid;place-items:center;font-family:var(--serif);font-size:21px;
+  color:var(--rule)}
+.r-meta{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);margin-top:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-track{position:relative;height:9px;margin-top:7px;margin-right:3px}
+.r-axis{position:absolute;top:4px;left:0;right:0;height:1px;background:var(--rule)}
+.r-span{position:absolute;top:3.5px;height:2px;background:var(--ink);opacity:.3;border-radius:2px}
+.r-span.wide{background:var(--spark);opacity:.75}
+.r-dot{position:absolute;top:1px;width:7px;height:7px;border-radius:50%;margin-left:-3.5px}
+.times{flex:none;font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--muted);
+  border:1px solid var(--rule);border-radius:999px;padding:2px 6px}
+.order{background:var(--card);border-left:2px solid var(--brass);border-radius:0 4px 4px 0;
+  padding:12px 14px;margin-top:18px;font-size:14.5px;line-height:1.5}
+.order-k{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.visits{margin-top:8px}
+.visit-row{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);padding:8px 0;
+  border-bottom:1px dotted var(--rule)}
+.visit-row button{background:none;border:0;color:var(--muted);font:inherit;
+  min-width:34px;min-height:34px;border-radius:4px;line-height:1}
+.visit-row button:hover{background:var(--sink);color:var(--ink)}
+.pend-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);border:1px solid var(--rule);border-radius:999px;padding:3px 8px}
+.w-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;
+  width:100%;max-width:100%;overflow:hidden;
+  min-height:62px;padding:13px 0;border:0;border-bottom:1px solid var(--rule);background:none;
+  text-align:left}
+.w-row:last-child{border-bottom:0}
+.w-name{display:block;font-family:var(--serif);font-size:21px;line-height:1.15;
+  overflow-wrap:anywhere}
+.w-note{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);margin-top:3px}
+.chip{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  border:1px solid var(--rule);border-radius:999px;padding:4px 9px;color:var(--muted);white-space:nowrap}
+.chip.set{border-color:var(--ink);color:var(--ink)}
+.dice{font-family:var(--serif);font-size:44px;line-height:1;margin:0 0 4px}
+.stats{width:100%;display:flex;align-items:center;gap:8px;padding:9px 0 11px;margin-bottom:2px;
+  border:0;border-bottom:1px solid var(--rule);background:none;text-align:left;
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted)}
+.stats b{font-weight:500;color:var(--ink)}
+.stats span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stats i{flex:none;margin-left:auto;font-style:normal;color:var(--rule)}
+
+/* ---- stats panel ---- */
+.s-hero{padding:6px 0 26px;border-bottom:1px solid var(--rule)}
+.s-num{font-family:var(--serif);font-size:76px;line-height:.86;letter-spacing:-.03em;margin:0}
+.s-num small{font-size:26px;letter-spacing:0;color:var(--muted)}
+.s-said{font-family:var(--serif);font-size:23px;line-height:1.25;margin:12px 0 0}
+.s-said em{font-style:normal}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:30px 0 14px;display:flex;align-items:baseline;gap:8px}
+.eyebrow:after{content:"";flex:1;height:1px;background:var(--rule)}
+
+/* One row of the paired comparison: label, the two-dot track, both numbers. */
+.pair{display:grid;grid-template-columns:4.6em minmax(0,1fr) auto;gap:10px;align-items:center;
+  padding:9px 0}
+.pair-l{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted)}
+.pair-v{font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums;
+  display:flex;gap:7px}
+.s-track{position:relative;height:13px}
+.s-axis{position:absolute;top:6px;left:0;right:0;height:1px;background:var(--rule)}
+.s-span{position:absolute;top:5.5px;height:2px;background:var(--ink);opacity:.25;border-radius:2px}
+.s-span.wide{background:var(--spark);opacity:.7}
+.s-dot{position:absolute;top:3px;width:8px;height:8px;border-radius:50%;margin-left:-4px}
+.s-scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;
+  color:var(--rule);margin-top:2px}
+
+.card{border-top:1px solid var(--rule);padding:15px 0}
+.card-k{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted)}
+.card-n{font-family:var(--serif);font-size:25px;line-height:1.2;margin:4px 0 0;
+  overflow-wrap:anywhere}
+.card-v{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px}
+.card-v b{color:var(--spark);font-weight:500}
+.s-foot{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);border-top:1px solid var(--rule);padding-top:14px;margin-top:26px}
+/* ---- upcoming ---- */
+.month{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:baseline;gap:9px;margin:24px 0 2px;padding-top:12px;
+  border-top:1px solid var(--rule)}
+.month:first-child{margin-top:8px;border-top:0;padding-top:0}
+.month:after{content:"";flex:1;height:1px;background:var(--rule)}
+.plan{display:grid;grid-template-columns:46px minmax(0,1fr);gap:0 12px;width:100%;
+  padding:14px 0;border:0;border-bottom:1px solid var(--rule);background:none;text-align:left}
+.plan:last-child{border-bottom:0}
+.p-day{text-align:center;font-family:var(--mono);line-height:1.1}
+.p-day b{display:block;font-family:var(--serif);font-size:25px;font-weight:400}
+.p-day span{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.p-day.tbc b{font-size:19px;color:var(--rule)}
+.p-title{display:block;font-family:var(--serif);font-size:20px;line-height:1.2;
+  overflow-wrap:anywhere}
+.p-when{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);margin-top:4px}
+.p-note{display:block;font-size:13.5px;color:var(--muted);margin-top:5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-shots{display:flex;gap:5px;margin-top:9px}
+.p-shots img{width:44px;height:44px;object-fit:cover;border-radius:3px;background:var(--sink)}
+.p-shots span{align-self:center;font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+.p-past{opacity:.55}
+.shots{display:grid;gap:9px;margin-top:14px}
+.shots figure{margin:0;position:relative}
+.shots img{width:100%;border-radius:4px;display:block;background:var(--sink)}
+.shot-x{position:absolute;top:7px;right:7px;width:32px;height:32px;border-radius:50%;
+  border:0;background:rgba(25,30,25,.72);color:#F1F3EB;font-size:15px;line-height:1}
+.section{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);margin:26px 0 2px;padding-top:12px;border-top:1px solid var(--rule)}
+.empty{font-family:var(--serif);font-size:22px;color:var(--muted);text-align:center;padding:60px 10px}
+
+/* ============ buttons ============ */
+.btn{flex:1;min-width:0;min-height:var(--tap);padding:0 12px;border:0;border-radius:4px;background:var(--ink);
+  color:var(--card);font-family:var(--mono);font-size:12px;letter-spacing:.11em;text-transform:uppercase}
+.btn[disabled]{opacity:.4}
+.btn.ghost{background:none;border:1.5px solid var(--rule);color:var(--muted)}
+.btn.danger{background:none;border:1.5px solid var(--spark);color:var(--spark)}
+.btn.slim{flex:0 0 auto}
+
+/* ============ panel ============ */
+.panel{position:fixed;left:50%;transform:translateX(-50%);top:0;width:var(--app-w);
+  max-width:100%;height:var(--app-h);z-index:40;overflow-x:clip;
+  background:var(--paper);display:none}
+.panel.open{display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.p-head{padding:calc(12px + var(--tg-top)) var(--pad) 12px;
+  border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:12px}
+.p-head h2{font-family:var(--serif);font-weight:400;font-size:25px;line-height:1.1;margin:0;
+  flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icon{width:var(--tap);height:var(--tap);flex:none;border:0;background:none;font-size:22px;
+  display:grid;place-items:center;border-radius:4px}
+.icon:hover{background:var(--sink)}
+.dots{display:flex;gap:5px}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--rule)}
+.dots i.on{background:var(--ink)}
+
+.hero{width:100%;aspect-ratio:16/10;object-fit:cover;background:var(--sink);border-radius:4px}
+.d-name{font-family:var(--serif);font-size:32px;line-height:1.05;margin:18px 0 6px;
+  overflow-wrap:anywhere}
+.d-meta{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted)}
+.d-total{font-family:var(--serif);font-size:60px;line-height:1;margin:20px 0 0}
+.d-sub{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted)}
+.grid{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:22px;
+  font-family:var(--mono);font-size:12px}
+.grid th,.grid td{padding:9px 4px;text-align:right;border-bottom:1px solid var(--rule)}
+.grid th:first-child,.grid td:first-child{text-align:left;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:400}
+.grid thead th{font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:500}
+.grid td{font-variant-numeric:tabular-nums}
+.grid tfoot td{font-weight:500;border-bottom:0;padding-top:12px}
+
+/* ============ form steps ============ */
+.step{padding:var(--pad) 0}
+.q{font-family:var(--serif);font-size:29px;line-height:1.12;margin:0 0 6px;overflow-wrap:anywhere}
+.q-hint{font-family:var(--mono);font-size:11px;color:var(--muted);margin:0 0 22px}
+.field{margin-bottom:20px}
+.field>label,.legend{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+input[type=text],input[type=date],textarea{width:100%;min-height:var(--tap);padding:12px 13px;
+  border:1.5px solid var(--rule);background:var(--card);color:var(--ink);border-radius:4px;
+  font:inherit;font-size:17px}
+textarea{font-family:var(--mono);font-size:15px;line-height:1.6;resize:vertical}
+input:focus,textarea:focus{outline:none;border-color:var(--ink)}
+.q-hint code{font-family:var(--mono);font-size:10.5px;background:var(--card);padding:1px 4px;
+  border-radius:2px}
+fieldset{border:0;padding:0;margin:0}
+.seg{display:flex;gap:7px}
+.seg button{flex:1;min-height:58px;border:1.5px solid var(--rule);background:var(--card);
+  color:var(--muted);border-radius:4px;font-family:var(--mono);font-size:11px;letter-spacing:.07em;
+  text-transform:uppercase;display:grid;place-items:center;gap:3px;padding:6px 2px}
+.seg button b{font-family:var(--serif);font-size:19px;font-weight:400;letter-spacing:0;
+  text-transform:none}
+.seg button[aria-checked="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.scale{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.scale button{aspect-ratio:1;min-height:52px;border:1.5px solid var(--rule);background:var(--card);
+  border-radius:4px;font-family:var(--mono);font-size:17px;color:var(--ink);padding:0}
+.scale button[aria-checked="true"]{color:var(--card);border-color:transparent}
+.drop{width:100%;aspect-ratio:16/10;border:1.5px dashed var(--rule);border-radius:4px;
+  background:var(--card);display:grid;place-items:center;gap:6px;overflow:hidden;padding:0;
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.drop img{width:100%;height:100%;object-fit:cover;display:none}
+.drop.has img{display:block}
+.drop.has span{display:none}
+.status{font-family:var(--mono);font-size:12px;margin-top:14px;min-height:18px;color:var(--spark)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ gate ============ -->
+<div class="gate" id="gate">
+  <div class="gate-mid">
+    <h1 class="mark">The<br>L<em>i</em>st</h1>
+    <p class="tagline" id="tagline">Everywhere we've eaten</p>
+
+    <div id="gate-pw">
+      <div class="pwfield">
+        <label for="pw">Password</label>
+        <input type="password" id="pw" autocomplete="current-password"
+               enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button class="peek" id="peek" type="button" aria-pressed="false"
+                aria-label="Show password">Show</button>
+      </div>
+    </div>
+
+    <div class="pick" id="gate-who" hidden role="group" aria-label="Who are you?"></div>
+    <p class="note" id="gate-note" role="status" aria-live="polite"></p>
+  </div>
+  <div class="bar" id="gate-bar" style="border-top:0;padding-left:0;padding-right:0">
+    <button class="btn" id="pw-go">Open the list</button>
+  </div>
+</div>
+
+<!-- ============ app ============ -->
+<div class="screen" id="app" hidden>
+  <header class="mast">
+    <div class="mast-row">
+      <h1>The List</h1>
+    </div>
+    <div class="key" id="key"></div>
+    <nav class="modes" id="modes" aria-label="Which list"></nav>
+    <nav class="filters" id="filters" aria-label="Filter by kind of place"></nav>
+  </header>
+  <main class="scroll" id="board" tabindex="-1"></main>
+  <div class="bar">
+    <button class="btn" id="add">+ Add a place</button>
+  </div>
+</div>
+
+<!-- ============ panel ============ -->
+<div class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="p-title">
+  <header class="p-head">
+    <button class="icon" id="p-back" aria-label="Back">&larr;</button>
+    <h2 id="p-title"></h2>
+    <div class="dots" id="p-dots" aria-hidden="true"></div>
+  </header>
+  <div class="scroll" id="p-body"></div>
+  <div class="bar" id="p-bar"></div>
+</div>
+
+<script>
+"use strict";
+
+const TIERS = ["cheap","normal","fancy"];
+const TIER_LABEL = {cheap:"Cheap eats", normal:"Normal", fancy:"Fancy"};
+const TIER_NOTE  = {cheap:"under ~$15", normal:"a sit-down meal", fancy:"an occasion"};
+const CATS = ["food","ambiance","aesthetics","service"];
+const HINT = {
+  food:"The cooking alone. Ignore everything else.",
+  ambiance:"How the room felt \u2014 noise, lighting, comfort.",
+  aesthetics:"How it looked \u2014 plating, interior, your photos.",
+  service:"The staff. Attentive, warm, competent, or not."
+};
+
+let PW = localStorage.getItem("makan.pw") || "";
+let ME = Number(localStorage.getItem("makan.me")) || null;
+let DATA = null, mode = "rated", filter = "all", lastFocus = null;
+
+// Opened inside Telegram? Then Telegram signs who you are and we skip the
+// password and the picker entirely.
+const TG = window.Telegram?.WebApp?.initData ? window.Telegram.WebApp : null;
+if (TG) {
+  TG.ready();
+  TG.expand();
+  // Match Telegram's own chrome to the page, so there's no dark bar above the sage.
+  try { TG.setHeaderColor("#DCE0D5"); TG.setBackgroundColor("#DCE0D5"); } catch {}
+  // Otherwise dragging the list down closes the whole app.
+  try { TG.disableVerticalSwipes?.(); } catch {}
+
+  const applyInsets = () => {
+    const root = document.documentElement;
+    // safeAreaInset is the device notch; contentSafeAreaInset is Telegram's own
+    // header. Neither reaches CSS env(), so they have to be set by hand.
+    const dev = TG.safeAreaInset || {top:0, bottom:0};
+    const chrome = TG.contentSafeAreaInset || {top:0, bottom:0};
+    root.style.setProperty("--tg-top", ((dev.top||0) + (chrome.top||0)) + "px");
+    root.style.setProperty("--tg-bottom", ((dev.bottom||0) + (chrome.bottom||0)) + "px");
+    // viewportStableHeight is the visible height; 100dvh overshoots in here.
+    const h = TG.viewportStableHeight || TG.viewportHeight || window.innerHeight;
+    root.style.setProperty("--app-h", h + "px");
+  };
+  applyInsets();
+  ["viewportChanged","safeAreaChanged","contentSafeAreaChanged"].forEach(ev => {
+    try { TG.onEvent(ev, () => { applyInsets(); pinWidth(); }); } catch {}
+  });
+  document.documentElement.classList.add("in-tg");
+}
+
+/**
+ * Telegram's webview can report a layout viewport wider than what's actually
+ * visible, which pushes the right edge of everything off screen. Pin the app to
+ * the narrowest width any API reports.
+ */
+function pinWidth() {
+  const cands = [
+    document.documentElement.clientWidth,
+    window.innerWidth,
+    window.visualViewport?.width,
+  ].filter(n => typeof n === "number" && n > 0);
+  if (!cands.length) return;
+  const w = Math.floor(Math.min(...cands));
+  document.documentElement.style.setProperty("--app-w", w + "px");
+}
+
+pinWidth();
+window.addEventListener("resize", pinWidth);
+window.visualViewport?.addEventListener("resize", pinWidth);
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const colour = i => i % 2 === 0 ? "var(--p1)" : "var(--p2)";
+const idx = id => Math.max(0, (DATA?.people ?? []).findIndex(p => p.id === id));
+const pos = s => ((s - 1) / 9) * 100;
+const shortDate = d => d ? new Date(d + "T00:00:00")
+  .toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"2-digit"}) : "no date";
+
+/**
+ * Phone photos are 3-8MB at 4000px. Base64 adds a third on top, and Netlify
+ * rejects request bodies over 6MB before the function ever runs. Downscaling
+ * here keeps uploads around 200-400KB and makes the page load faster too.
+ */
+const MAX_EDGE = 1600;
+function shrink(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("That file isn't an image")); };
+    img.src = url;
+  });
+}
+
+async function api(action, payload = {}) {
+  const res = await fetch("/api", {
+    method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({action, password: PW, initData: TG?.initData, ...payload})
+  });
+  let out;
+  try {
+    out = await res.json();
+  } catch {
+    // Non-JSON means the request never reached the function.
+    throw new Error(res.status === 413
+      ? "That photo is too large to upload."
+      : "The server didn't respond (" + res.status + "). Try again.");
+  }
+  if (!res.ok) throw new Error(out.error || "Something went wrong");
+  return out;
+}
+
+/* ================= gate ================= */
+
+$("peek").onclick = () => {
+  const on = $("pw").type === "password";
+  $("pw").type = on ? "text" : "password";
+  $("peek").textContent = on ? "Hide" : "Show";
+  $("peek").setAttribute("aria-pressed", String(on));
+  $("peek").setAttribute("aria-label", on ? "Hide password" : "Show password");
+};
+
+$("pw-go").onclick = async () => {
+  const note = $("gate-note");
+  note.textContent = "";
+  if (!$("pw").value) { note.textContent = "Enter the password to continue."; $("pw").focus(); return; }
+  $("pw-go").disabled = true;
+  $("pw-go").textContent = "Checking";
+  try {
+    PW = $("pw").value;
+    DATA = await api("list");
+    localStorage.setItem("makan.pw", PW);
+    (ME && DATA.people.some(p => p.id === ME)) ? start() : showWho();
+  } catch (e) {
+    note.textContent = e.message;
+    $("pw").select();
+  } finally {
+    $("pw-go").disabled = false;
+    $("pw-go").textContent = "Open the list";
+  }
+};
+$("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("pw-go").click(); });
+
+function showWho() {
+  $("gate-pw").hidden = true;
+  $("gate-bar").hidden = true;
+  $("tagline").textContent = "Which one are you?";
+  const who = $("gate-who");
+  who.hidden = false;
+  who.innerHTML = DATA.people.length
+    ? DATA.people.map((p,i) =>
+        '<button data-id="'+p.id+'"><i class="swatch" style="background:'+colour(i)+'"></i>'
+        + esc(p.name)+'</button>').join("")
+    : '<p class="note">Nobody has used the bot yet. Send it a message in Telegram first, then reload.</p>';
+  who.querySelectorAll("button").forEach(b => b.onclick = () => {
+    ME = Number(b.dataset.id);
+    localStorage.setItem("makan.me", ME);
+    start();
+  });
+  who.querySelector("button")?.focus();
+}
+
+function start() {
+  $("gate").hidden = true;
+  $("app").hidden = false;
+  render();
+}
+
+/* ================= list ================= */
+
+function miniTrack(e) {
+  const sorted = [...e.scores].sort((a,b) => a.total - b.total);
+  const lo = sorted[0].total, hi = sorted[sorted.length-1].total;
+  return '<div class="r-track" aria-hidden="true"><div class="r-axis"></div>'
+    + '<div class="r-span'+(e.gap>=1.5?" wide":"")+'" style="left:'+pos(lo)
+    + '%;width:'+(pos(hi)-pos(lo))+'%"></div>'
+    + e.scores.map(s => '<i class="r-dot" style="left:'+pos(s.total)+'%;background:'
+        + colour(idx(s.personId))+'"></i>').join("") + '</div>';
+}
+
+function thumb(e) {
+  return e.photo_url
+    ? '<img class="r-thumb" src="'+esc(e.photo_url)+'" alt="" loading="lazy">'
+    : '<div class="r-thumb none" aria-hidden="true">'+esc(e.name.trim()[0] || "?")+'</div>';
+}
+
+/** "3 wks ago" — the thing you actually want when deciding where to go. */
+function ago(dateStr) {
+  if (!dateStr) return null;
+  const days = Math.floor((Date.now() - new Date(dateStr + "T00:00:00")) / 86400000);
+  if (days < 0) return null;
+  if (days === 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 14) return days + " days ago";
+  if (days < 60) return Math.round(days / 7) + " wks ago";
+  if (days < 365) return Math.round(days / 30) + " mths ago";
+  return Math.round(days / 365) + "y ago";
+}
+
+function rowHtml(e, rank) {
+  const meta = [TIER_LABEL[e.tier], ago(e.lastVisit) || shortDate(e.visited_on)];
+  if (e.gap >= 1.5) meta.push("split " + e.gap.toFixed(1));
+  const label = e.name + ", " + e.combined.toFixed(2) + " out of 10, " + TIER_LABEL[e.tier];
+  return '<button class="row" data-open="'+e.id+'" aria-label="'+esc(label)+'">'
+    + thumb(e)
+    + '<span class="r-body">'
+    +   '<span class="r-top">'
+    +     '<span class="r-rank'+(rank>3?" plain":"")+'" aria-hidden="true">'+rank+'</span>'
+    +     '<span class="r-name">'+esc(e.name)+'</span>'
+    +     '<span class="r-score">'+e.combined.toFixed(2)+'</span>'
+    +   '</span>'
+    +   '<span class="r-meta">'+meta.join(" &middot; ")+'</span>'
+    +   miniTrack(e)
+    + '</span></button>';
+}
+
+function pendHtml(e) {
+  return '<button class="row" data-open="'+e.id+'" aria-label="'+esc(e.name+", not fully rated")+'">'
+    + thumb(e)
+    + '<span class="r-body"><span class="r-top">'
+    +   '<span class="r-name">'+esc(e.name)+'</span>'
+    +   '<span class="r-score"><span class="pend-tag">Rate</span></span>'
+    + '</span>'
+    + '<span class="r-meta">'+esc(e.progress)+'</span></span></button>';
+}
+
+function render() {
+  if (mode === "want") return renderWant();
+  if (mode === "upcoming") return renderUpcoming();
+  const list = DATA.entries.filter(e => filter === "all" || e.tier === filter);
+
+  renderKey();
+  renderNav();
+
+  const strip = statsStrip();
+  let html = (strip && DATA.entries.length >= 2 ? strip : "") + (list.length
+    ? list.map((e,i) => rowHtml(e, filter === "all" ? e.overallRank : i+1)).join("")
+    : '<p class="empty">Nothing here yet.<br>Add a place below.</p>');
+
+  if (DATA.pending.length) {
+    html += '<p class="section">Waiting on a rating</p>' + DATA.pending.map(pendHtml).join("");
+  }
+  $("board").innerHTML = html;
+  $("board").querySelectorAll("[data-open]").forEach(b =>
+    b.onclick = () => openDetail(Number(b.dataset.open)));
+  const statsBtn = $("board").querySelector(".stats");
+  if (statsBtn) statsBtn.onclick = openStats;
+
+  $("app").querySelector(".bar").innerHTML =
+    '<button class="btn ghost" id="roll">\u{1F501} Pick</button>'
+    + '<button class="btn" id="add">+ Add a place</button>';
+  $("roll").onclick = rollAgain;
+  $("add").onclick = () => openForm(null);
+}
+
+function renderKey() {
+  // First name only: full names blow the header wider than the screen.
+  $("key").innerHTML = DATA.people.map((p,i) =>
+    '<span class="who'+(p.id===ME?" me":"")+'" title="'+esc(p.name)+'">'
+    + '<i class="swatch" style="background:'+colour(i)+'"></i>'
+    + esc(p.name.trim().split(/\s+/)[0])
+    + '<span class="sr"> '+esc(p.name)+(p.id===ME?" (you)":"")+'</span></span>').join("")
+    ;
+}
+
+function renderNav() {
+  // Want-to-eat is a different list, not a tier. Splitting them means four
+  // short chips instead of five long ones, which fits without scrolling.
+  $("modes").innerHTML = [
+      ["rated","Been " + (DATA.counts.all || 0)],
+      ["want","Want " + (DATA.counts.want || 0)],
+      ["upcoming","Upcoming " + (DATA.counts.upcoming || 0)],
+    ].map(([m,l]) => '<button data-m="'+m+'" aria-pressed="'+(m===mode)+'">'+l+'</button>').join("");
+  $("modes").querySelectorAll("button").forEach(b =>
+    b.onclick = () => { mode = b.dataset.m; render(); $("board").scrollTop = 0; });
+
+  const tiers = $("filters");
+  tiers.hidden = mode !== "rated";
+  if (mode !== "rated") { tiers.innerHTML = ""; return; }
+  tiers.innerHTML = [["all","All"],["cheap","Cheap"],["normal","Normal"],["fancy","Fancy"]]
+    .map(([t,l]) => '<button data-t="'+t+'" aria-pressed="'+(t===filter)+'">'
+      + l+' '+(DATA.counts[t]||0)+'</button>').join("");
+  tiers.querySelectorAll("button").forEach(b =>
+    b.onclick = () => { filter = b.dataset.t; render(); $("board").scrollTop = 0; });
+}
+
+function renderWant() {
+  renderKey();
+  renderNav();
+  const list = DATA.wishlist ?? [];
+  $("board").innerHTML = list.length
+    ? list.map(w =>
+        '<button class="w-row" data-want="'+w.id+'" aria-label="'+esc(w.name)+'">'
+        + '<span><span class="w-name">'+esc(w.name)+'</span>'
+        + (w.note ? '<span class="w-note">'+esc(w.note)+'</span>' : "")+'</span>'
+        + '<span class="chip'+(w.tier?" set":"")+'">'
+        + (w.tier ? TIER_LABEL[w.tier] : "untagged")+'</span></button>').join("")
+    : '<p class="empty">Nothing on the want list.<br>Add somewhere you\u2019d like to try.</p>';
+  $("board").querySelectorAll("[data-want]").forEach(b =>
+    b.onclick = () => openWant(Number(b.dataset.want)));
+
+  $("app").querySelector(".bar").innerHTML =
+    '<button class="btn ghost" id="roll">\u{1F3B2} Pick</button>'
+    + '<button class="btn ghost" id="paste">Paste list</button>'
+    + '<button class="btn" id="add">+ Add</button>';
+  $("roll").onclick = () => rollOne();
+  $("paste").onclick = openPaste;
+  $("add").onclick = () => openWantForm(null);
+}
+
+/* ================= stats ================= */
+
+/** Everything the stats view needs, derived from what's already loaded. */
+function computeStats() {
+  const es = DATA.entries;
+  if (es.length < 2 || DATA.people.length < 2) return null;
+
+  const per = DATA.people.map(p => {
+    const mine = es.map(e => e.scores.find(s => s.personId === p.id)).filter(Boolean);
+    const avg = mine.reduce((a, s) => a + s.total, 0) / (mine.length || 1);
+    const cats = Object.fromEntries(CATS.map(c =>
+      [c, mine.reduce((a, s) => a + s[c], 0) / (mine.length || 1)]));
+    return {...p, avg, cats, n: mine.length};
+  });
+
+  const sorted = [...es].sort((a, b) => b.gap - a.gap);
+  const tiers = TIERS.map(t => {
+    const inT = es.filter(e => e.tier === t);
+    return {tier: t, n: inT.length,
+            avg: inT.length ? inT.reduce((a, e) => a + e.combined, 0) / inT.length : 0};
+  }).filter(t => t.n);
+
+  const returned = [...es].sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0))[0];
+  const generous = [...per].sort((a, b) => b.avg - a.avg)[0];
+  const harsh = [...per].sort((a, b) => a.avg - b.avg)[0];
+
+  return {
+    per, tiers,
+    count: es.length,
+    avg: es.reduce((a, e) => a + e.combined, 0) / es.length,
+    returned,
+    widest: sorted[0],
+    closest: sorted[sorted.length - 1],
+    generous, harsh,
+    spread: generous.avg - harsh.avg,
+    splits: es.filter(e => e.gap >= 1.5).length,
+  };
+}
+
+function statsStrip() {
+  const st = computeStats();
+  if (!st) return "";
+  const line = st.spread >= 0.15
+    ? esc(st.generous.name.split(/\s+/)[0]) + " rates <b>" + st.spread.toFixed(2)
+      + "</b> higher on average"
+    : "You two are within <b>" + st.spread.toFixed(2) + "</b> of each other";
+  return '<button class="stats" aria-label="See the numbers">'
+    + '<span>' + line + '</span><i>See more</i></button>';
+}
+
+function openStats() {
+  const st = computeStats();
+  if (!st) return;
+
+  const p1 = st.per[0], p2 = st.per[1];
+  const short = p => esc(p.name.trim().split(/\s+/)[0]);
+  const at = v => ((v - 1) / 9) * 100;
+
+  // The same two-dot track used on every list row, so the whole app reads the
+  // same way: distance between the dots is the disagreement.
+  const track = (a, b, flag) => {
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    return '<div class="s-track"><div class="s-axis"></div>'
+      + '<div class="s-span' + (flag ? ' wide' : '') + '" style="left:' + at(lo)
+      + '%;width:' + (at(hi) - at(lo)) + '%"></div>'
+      + '<i class="s-dot" style="left:' + at(a) + '%;background:' + colour(idx(p1.id)) + '"></i>'
+      + '<i class="s-dot" style="left:' + at(b) + '%;background:' + colour(idx(p2.id)) + '"></i>'
+      + '</div>';
+  };
+
+  const pair = (label, a, b) =>
+    '<div class="pair"><span class="pair-l">' + label + '</span>'
+    + track(a, b, Math.abs(a - b) >= 1.5)
+    + '<span class="pair-v">'
+    +   '<span style="color:' + colour(idx(p1.id)) + '">' + a.toFixed(1) + '</span>'
+    +   '<span style="color:' + colour(idx(p2.id)) + '">' + b.toFixed(1) + '</span>'
+    + '</span></div>';
+
+  let body = '<div class="step">';
+
+  // Hero: the one number worth leading with.
+  body += '<div class="s-hero">'
+    + '<p class="s-num">' + (st.spread >= 0.05 ? "+" : "") + st.spread.toFixed(2)
+    + '<small> / 10</small></p>'
+    + '<p class="s-said">' + (st.spread >= 0.15
+        ? '<em style="color:' + colour(idx(st.generous.id)) + '">' + esc(st.generous.name) + '</em>'
+          + ' is the softer marker.'
+        : 'You mark almost identically.')
+    + '</p></div>';
+
+  body += '<p class="eyebrow">Overall average</p>'
+    + pair("Overall", p1.avg, p2.avg)
+    + '<div class="s-scale"><span>1</span><span>10</span></div>';
+
+  body += '<p class="eyebrow">Category by category</p>'
+    + CATS.map(c => pair(c, p1.cats[c], p2.cats[c])).join("")
+    + '<div class="s-scale"><span>1</span><span>10</span></div>';
+
+  body += '<p class="eyebrow">Where you split</p>'
+    + '<div class="card"><span class="card-k">Furthest apart</span>'
+    + '<p class="card-n">' + esc(st.widest.name) + '</p>'
+    + '<p class="card-v"><b>' + st.widest.gap.toFixed(2) + '</b> apart</p></div>'
+    + '<div class="card"><span class="card-k">Closest</span>'
+    + '<p class="card-n">' + esc(st.closest.name) + '</p>'
+    + '<p class="card-v">' + st.closest.gap.toFixed(2) + ' apart</p></div>';
+
+  body += '<p class="eyebrow">By tier</p>'
+    + st.tiers.map(t => {
+        const inT = DATA.entries.filter(e => e.tier === t.tier);
+        const a = inT.reduce((x, e) => x + (e.scores.find(s => s.personId === p1.id)?.total ?? 0), 0) / t.n;
+        const b = inT.reduce((x, e) => x + (e.scores.find(s => s.personId === p2.id)?.total ?? 0), 0) / t.n;
+        return pair(TIER_LABEL[t.tier].split(" ")[0], a, b);
+      }).join("")
+    + '<div class="s-scale"><span>1</span><span>10</span></div>';
+
+  body += '<p class="s-foot">' + st.count + ' places \u00b7 average '
+    + st.avg.toFixed(2) + ' \u00b7 ' + st.splits + ' split by 1.5+</p>';
+
+  body += '</div>';
+
+  panelClose();
+  panelOpen("The numbers", body, '<button class="btn" id="s-close">Done</button>');
+  $("p-back").dataset.act = "close";
+  $("s-close").onclick = panelClose;
+}
+
+/**
+ * Revisit roll. Weighted by score, because uniform random keeps offering the
+ * one you both rated 6.5 — not what "where should we go" means. Squaring the
+ * distance above 4 makes an 8.9 about three times likelier than a 6.9.
+ */
+function rollAgain() {
+  const all = DATA.entries.filter(e => filter === "all" || e.tier === filter);
+  if (!all.length) { alert("Nothing fully rated in that tier yet."); return; }
+  // Don't suggest last week's dinner. Falls back to everything if that empties it.
+  const cutoff = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const fresh = all.filter(e => !e.lastVisit || e.lastVisit < cutoff);
+  const pool = fresh.length ? fresh : all;
+
+  const weights = pool.map(e => Math.pow(Math.max(0.1, e.combined - 4), 2));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total, e = pool[pool.length - 1];
+  for (let i = 0; i < pool.length; i++) { r -= weights[i]; if (r <= 0) { e = pool[i]; break; } }
+
+  panelClose();
+  panelOpen("Go back to",
+    '<div class="step" style="text-align:center">'
+    + (e.photo_url ? '<img class="hero" src="'+esc(e.photo_url)+'" alt="">' : '')
+    + '<h3 class="q" style="font-size:36px;margin-top:20px">'+esc(e.name)+'</h3>'
+    + '<p class="q-hint">'+TIER_LABEL[e.tier]+' \u00b7 you gave it '+e.combined.toFixed(2)+'</p>'
+    + '<p class="d-sub" style="margin-top:26px">weighted towards what you rated highly</p></div>',
+    '<button class="btn ghost" id="a-again">\u{1F3B2} Again</button>'
+    + '<button class="btn" id="a-open">See the scores</button>');
+  $("p-back").dataset.act = "close";
+  $("a-again").onclick = rollAgain;
+  $("a-open").onclick = () => openDetail(e.id);
+}
+
+/** Rolls from the want list \u2014 somewhere new. Uniform, since none are rated. */
+function rollOne(tier = null) {
+  const pool = (DATA.wishlist ?? []).filter(w => !tier || w.tier === tier);
+  if (!pool.length) { alert("Nothing to pick from in that tier."); return; }
+  const w = pool[Math.floor(Math.random() * pool.length)];
+  panelClose();
+  panelOpen("Tonight",
+    '<div class="step" style="text-align:center;padding-top:14vh">'
+    + '<p class="dice" aria-hidden="true">\u{1F3B2}</p>'
+    + '<h3 class="q" style="font-size:38px">'+esc(w.name)+'</h3>'
+    + '<p class="q-hint">'+(w.tier ? TIER_LABEL[w.tier] : "tier not tagged yet")
+    + (w.note ? " \u00b7 " + esc(w.note) : "")+'</p></div>',
+    '<button class="btn ghost" id="r-again">\u{1F3B2} Again</button>'
+    + '<button class="btn" id="r-went">We went</button>');
+  $("p-back").dataset.act = "close";
+  $("r-again").onclick = () => rollOne(tier);
+  $("r-went").onclick = async () => {
+    $("r-went").disabled = true;
+    try {
+      const {id} = await api("wantWent", {id: w.id, visited_on: new Date().toISOString().slice(0,10)});
+      DATA = await api("list");
+      mode = "rated"; filter = "all";
+      panelClose();
+      render();
+      openForm(id, 2);
+    } catch (err) { alert(err.message); $("r-went").disabled = false; }
+  };
+}
+
+/* ================= upcoming ================= */
+
+const KINDS = ["booking","tickets","trip","plan"];
+const KIND_LABEL = {booking:"Booking", tickets:"Tickets", trip:"Trip", plan:"Plan"};
+const KIND_EMOJI = {booking:"\u{1F37D}\uFE0F", tickets:"\u{1F39F}\uFE0F", trip:"\u2708\uFE0F", plan:"\u{1F4CC}"};
+const MONTH_NAME = ["January","February","March","April","May","June",
+                    "July","August","September","October","November","December"];
+const todayStr = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+
+function planWhen(p) {
+  if (p.on_date) {
+    const d = new Date(p.on_date + "T00:00:00");
+    const day = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+    return day + (p.at_time ? " \u00b7 " + p.at_time : "");
+  }
+  return p.when_text || "date TBC";
+}
+
+function planHtml(p) {
+  const past = p.on_date && p.on_date < todayStr();
+  let day = '<span class="p-day tbc"><b>?</b><span>TBC</span></span>';
+  if (p.on_date) {
+    const d = new Date(p.on_date + "T00:00:00");
+    day = '<span class="p-day"><b>' + d.getDate() + '</b><span>'
+      + MONTH_NAME[d.getMonth()].slice(0,3) + '</span></span>';
+  }
+  const shots = p.photos.length
+    ? '<span class="p-shots">'
+      + p.photos.slice(0,3).map(u => '<img src="'+esc(u)+'" alt="" loading="lazy">').join("")
+      + (p.photos.length > 3 ? '<span>+'+(p.photos.length-3)+'</span>' : "")
+      + '</span>'
+    : "";
+  return '<button class="plan'+(past?" p-past":"")+'" data-plan="'+p.id+'" aria-label="'+esc(p.title)+'">'
+    + day
+    + '<span><span class="p-title">'+esc(p.title)+'</span>'
+    + '<span class="p-when">'+KIND_EMOJI[p.kind]+' '+esc(planWhen(p))+'</span>'
+    + (p.note ? '<span class="p-note">'+esc(p.note)+'</span>' : "")
+    + shots + '</span></button>';
+}
+
+function renderUpcoming() {
+  renderKey();
+  renderNav();
+  const all = DATA.upcoming ?? [];
+  const t = todayStr();
+  const soon = all.filter(p => !p.on_date || p.on_date >= t);
+  const past = all.filter(p => p.on_date && p.on_date < t).reverse();
+
+  let html = "";
+  if (!all.length) {
+    html = '<p class="empty">Nothing planned.<br>Add a date, or send the bot a screenshot.</p>';
+  } else {
+    // Grouped by month, undated last \u2014 plans usually start as "sometime in October".
+    let lastMonth = null;
+    for (const p of soon.filter(x => x.on_date)) {
+      const d = new Date(p.on_date + "T00:00:00");
+      const key = MONTH_NAME[d.getMonth()] + " " + d.getFullYear();
+      if (key !== lastMonth) { html += '<p class="month">'+key+'</p>'; lastMonth = key; }
+      html += planHtml(p);
+    }
+    const undated = soon.filter(x => !x.on_date);
+    if (undated.length) {
+      html += '<p class="month">No date yet</p>' + undated.map(planHtml).join("");
+    }
+    if (past.length) {
+      html += '<p class="month">Been and gone</p>' + past.map(planHtml).join("");
+    }
+  }
+  $("board").innerHTML = html;
+  $("board").querySelectorAll("[data-plan]").forEach(b =>
+    b.onclick = () => openPlan(Number(b.dataset.plan)));
+
+  $("app").querySelector(".bar").innerHTML = '<button class="btn" id="add">+ Add a plan</button>';
+  $("add").onclick = () => openPlanForm(null);
+}
+
+function openPlan(id) {
+  const p = (DATA.upcoming ?? []).find(x => x.id === id);
+  if (!p) return;
+  const past = p.on_date && p.on_date < todayStr();
+
+  let body = '<div class="step">'
+    + '<p class="d-meta">'+KIND_EMOJI[p.kind]+' '+KIND_LABEL[p.kind]+'</p>'
+    + '<h3 class="d-name">'+esc(p.title)+'</h3>'
+    + '<p class="d-sub">'+esc(p.on_date ? p.on_date + (p.at_time ? " \u00b7 " + p.at_time : "")
+        : (p.when_text || "date TBC"))+'</p>'
+    + (p.note ? '<p style="margin-top:16px">'+esc(p.note)+'</p>' : "")
+    + (p.photos.length
+        ? '<div class="shots">'+p.photos.map(u =>
+            '<figure><img src="'+esc(u)+'" alt=""></figure>').join("")+'</div>'
+        : '<p class="q-hint" style="margin-top:18px">No screenshots attached yet.</p>')
+    + '</div>';
+
+  panelClose();
+  panelOpen(p.title, body,
+    (past && p.is_food ? '<button class="btn ghost" id="pl-rate">Add to the list</button>' : "")
+    + '<button class="btn ghost slim" id="pl-del">Delete</button>'
+    + '<button class="btn" id="pl-edit">Edit</button>');
+  $("p-back").dataset.act = "close";
+
+  $("pl-edit").onclick = () => openPlanForm(p);
+  $("pl-del").onclick = async () => {
+    if (!confirm("Delete " + p.title + "?")) return;
+    await api("planDrop", {id: p.id});
+    DATA = await api("list");
+    panelClose(); render();
+  };
+  // A booking that's been and gone is a place you can now rate.
+  if (past && p.is_food) $("pl-rate").onclick = async () => {
+    try {
+      const {id} = await api("add", {name: p.title, tier: "normal", visited_on: p.on_date});
+      await api("planUpdate", {id: p.id, archived: true});
+      DATA = await api("list");
+      mode = "rated"; filter = "all";
+      panelClose(); render();
+      openForm(id, 2);
+    } catch (err) { alert(err.message); }
+  };
+}
+
+function openPlanForm(p) {
+  let kind = p?.kind ?? "plan";
+  let pending = [];
+
+  panelClose();
+  panelOpen(p ? "Edit" : "Add a plan",
+    '<div class="step">'
+    + '<div class="field"><label for="pf-title">What is it?</label>'
+    + '<input type="text" id="pf-title" value="'+esc(p?.title ?? "")+'" autocapitalize="words"'
+    + ' placeholder="Dinner at Odette"></div>'
+    + '<fieldset class="field"><legend class="legend">Kind</legend>'
+    + '<div class="seg" role="radiogroup" aria-label="Kind" id="pf-kind">'
+    + KINDS.map(k => '<button role="radio" data-k="'+k+'" aria-checked="'+(k===kind)+'">'
+        + '<b>'+KIND_EMOJI[k]+'</b>'+KIND_LABEL[k]+'</button>').join("")
+    + '</div></fieldset>'
+    + '<div class="field"><label for="pf-date">Date, if you know it</label>'
+    + '<input type="date" id="pf-date" value="'+esc(p?.on_date ?? "")+'"></div>'
+    + '<div class="field"><label for="pf-time">Time (however you like)</label>'
+    + '<input type="text" id="pf-time" value="'+esc(p?.at_time ?? "")+'" placeholder="7.30pm, doors 8"></div>'
+    + '<div class="field"><label for="pf-rough">Or roughly when</label>'
+    + '<input type="text" id="pf-rough" value="'+esc(p?.when_text ?? "")+'" placeholder="mid-October, TBC"></div>'
+    + '<div class="field"><label for="pf-note">Notes</label>'
+    + '<input type="text" id="pf-note" value="'+esc(p?.note ?? "")+'" placeholder="under Ethan, 2 pax"></div>'
+    + '<div class="field"><label>Screenshots</label>'
+    + '<div class="shots" id="pf-shots"></div>'
+    + '<button class="btn ghost" id="pf-pick" style="margin-top:10px">+ Add a screenshot</button>'
+    + '<input type="file" id="pf-file" accept="image/*" multiple class="sr"></div>'
+    + '<p class="status" id="pf-note-msg" role="status" aria-live="polite"></p></div>',
+    '<button class="btn ghost" id="pf-cancel">Cancel</button>'
+    + '<button class="btn" id="pf-save">Save</button>');
+  $("p-back").dataset.act = "close";
+
+  const drawShots = () => {
+    const existing = (p?.photos ?? []).map(u =>
+      '<figure><img src="'+esc(u)+'" alt=""><button class="shot-x" data-rm="'+esc(u)+'" '
+      + 'aria-label="Remove">\u2715</button></figure>').join("");
+    const fresh = pending.map((d,i) =>
+      '<figure><img src="'+d+'" alt=""><button class="shot-x" data-new="'+i+'" '
+      + 'aria-label="Remove">\u2715</button></figure>').join("");
+    $("pf-shots").innerHTML = existing + fresh;
+    $("pf-shots").querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => {
+      await api("planPhotoDrop", {id: p.id, url: b.dataset.rm});
+      p.photos = p.photos.filter(u => u !== b.dataset.rm);
+      drawShots();
+    });
+    $("pf-shots").querySelectorAll("[data-new]").forEach(b => b.onclick = () => {
+      pending.splice(Number(b.dataset.new), 1); drawShots();
+    });
+  };
+  drawShots();
+
+  $("pf-kind").querySelectorAll("button").forEach(b => b.onclick = () => {
+    kind = b.dataset.k;
+    $("pf-kind").querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-checked", String(x === b)));
+  });
+
+  $("pf-pick").onclick = () => $("pf-file").click();
+  $("pf-file").onchange = async () => {
+    const msg = $("pf-note-msg");
+    msg.style.color = "var(--muted)";
+    msg.textContent = "Preparing\u2026";
+    for (const f of [...$("pf-file").files]) {
+      try { pending.push(await shrink(f)); }
+      catch { msg.style.color = "var(--spark)"; msg.textContent = "One of those wasn't an image."; }
+    }
+    msg.textContent = "";
+    drawShots();
+  };
+
+  $("pf-cancel").onclick = panelClose;
+  $("pf-save").onclick = async () => {
+    const msg = $("pf-note-msg");
+    const title = $("pf-title").value.trim();
+    if (!title) { msg.style.color = "var(--spark)"; msg.textContent = "Give it a title."; return; }
+    $("pf-save").disabled = true;
+    msg.style.color = "var(--muted)";
+    msg.textContent = "Saving\u2026";
+    try {
+      const payload = {
+        title, kind,
+        on_date: $("pf-date").value || null,
+        at_time: $("pf-time").value.trim() || null,
+        when_text: $("pf-rough").value.trim() || null,
+        note: $("pf-note").value.trim() || null,
+        is_food: kind === "booking",
+      };
+      let id = p?.id;
+      if (id) await api("planUpdate", {id, ...payload});
+      else id = (await api("planAdd", payload)).id;
+
+      for (let i = 0; i < pending.length; i++) {
+        msg.textContent = "Uploading " + (i+1) + " of " + pending.length + "\u2026";
+        await api("planPhoto", {id, dataUrl: pending[i]});
+      }
+      DATA = await api("list");
+      panelClose();
+      render();
+    } catch (err) {
+      msg.style.color = "var(--spark)";
+      msg.textContent = err.message;
+      $("pf-save").disabled = false;
+    }
+  };
+}
+
+/** Paste a whole list at once instead of one form per place. */
+function openPaste() {
+  panelClose();
+  panelOpen("Paste a list",
+    '<div class="step">'
+    + '<h3 class="q">One place per line</h3>'
+    + '<p class="q-hint">Bullets and numbering are fine. Put <code>| cheap</code> on the end to '
+    + 'tag a tier, and anything in (brackets) becomes a note. Drop any heading line.</p>'
+    + '<textarea id="p-text" rows="12" placeholder="- ATLAS BAR&#10;- ODETTE | fancy&#10;'
+    + '- LES AMIS (when we rich rich)"></textarea>'
+    + '<p class="status" id="p-note" role="status" aria-live="polite"></p></div>',
+    '<button class="btn ghost" id="p-cancel">Cancel</button>'
+    + '<button class="btn" id="p-save">Add them</button>');
+  $("p-back").dataset.act = "close";
+  $("p-cancel").onclick = panelClose;
+  $("p-save").onclick = async () => {
+    const text = $("p-text").value;
+    if (!text.trim()) { $("p-note").textContent = "Paste something first."; return; }
+    $("p-save").disabled = true;
+    $("p-note").style.color = "var(--muted)";
+    $("p-note").textContent = "Adding\u2026";
+    try {
+      const res = await api("wantBulk", {text});
+      DATA = await api("list");
+      panelClose();
+      render();
+      if (res.skipped?.length) {
+        alert("Added " + res.added + ". Already on the list: " + res.skipped.join(", "));
+      }
+    } catch (err) {
+      $("p-note").style.color = "var(--spark)";
+      $("p-note").textContent = err.message;
+      $("p-save").disabled = false;
+    }
+  };
+}
+
+function openWant(id) {
+  const w = (DATA.wishlist ?? []).find(x => x.id === id);
+  if (!w) return;
+  openWantForm(w);
+}
+
+function openWantForm(w) {
+  const tier = w?.tier ?? null;
+  panelClose();
+  panelOpen(w ? w.name : "Add to want list",
+    '<div class="step">'
+    + '<h3 class="q">'+(w ? "Somewhere you want to try" : "Where do you want to try?")+'</h3>'
+    + '<p class="q-hint">Tier is optional \u2014 tag it if you know, leave it if you don\u2019t.</p>'
+    + '<div class="field"><label for="w-name">Name</label>'
+    + '<input type="text" id="w-name" value="'+esc(w?.name ?? "")+'" autocapitalize="words"></div>'
+    + '<fieldset class="field"><legend class="legend">Kind of place</legend>'
+    + '<div class="seg" role="radiogroup" aria-label="Kind of place" id="w-tier">'
+    + '<button role="radio" data-t="" aria-checked="'+(!tier)+'"><b>Unsure</b>tag later</button>'
+    + TIERS.map(t => '<button role="radio" data-t="'+t+'" aria-checked="'+(t===tier)+'">'
+        + '<b>'+TIER_LABEL[t]+'</b>'+TIER_NOTE[t]+'</button>').join("")
+    + '</div></fieldset>'
+    + '<p class="status" id="w-note" role="status" aria-live="polite"></p></div>',
+    (w ? '<button class="btn ghost slim" id="w-del">Remove</button>'
+       + '<button class="btn ghost" id="w-went">We went</button>' : "")
+    + '<button class="btn" id="w-save">Save</button>');
+  $("p-back").dataset.act = "close";
+
+  let chosen = tier;
+  $("w-tier").querySelectorAll("button").forEach(b => b.onclick = () => {
+    chosen = b.dataset.t || null;
+    $("w-tier").querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-checked", String(x === b)));
+  });
+
+  $("w-save").onclick = async () => {
+    const name = $("w-name").value.trim();
+    if (!name) { $("w-note").textContent = "Give it a name first."; return; }
+    $("w-save").disabled = true;
+    try {
+      if (w) await api("wantUpdate", {id: w.id, name, tier: chosen});
+      else await api("wantAdd", {name, tier: chosen});
+      DATA = await api("list");
+      panelClose();
+      render();
+    } catch (err) { $("w-note").textContent = err.message; $("w-save").disabled = false; }
+  };
+
+  if (w) {
+    $("w-del").onclick = async () => {
+      if (!confirm("Take " + w.name + " off the want list?")) return;
+      await api("wantDrop", {id: w.id});
+      DATA = await api("list");
+      panelClose();
+      render();
+    };
+    $("w-went").onclick = async () => {
+      try {
+        const {id} = await api("wantWent", {id: w.id, visited_on: new Date().toISOString().slice(0,10)});
+        DATA = await api("list");
+        mode = "rated"; filter = "all";
+        panelClose();
+        render();
+        openForm(id, 2);
+      } catch (err) { $("w-note").textContent = err.message; }
+    };
+  }
+}
+
+$("add").onclick = () => openForm(null);
+
+/* ================= panel plumbing ================= */
+
+function panelOpen(title, bodyHtml, barHtml, opts = {}) {
+  lastFocus = lastFocus || document.activeElement;
+  $("p-title").textContent = title;
+  $("p-body").innerHTML = bodyHtml;
+  $("p-bar").innerHTML = barHtml;
+  $("p-dots").innerHTML = opts.steps
+    ? Array.from({length:opts.steps}, (_,i) => '<i class="'+(i<=opts.step?"on":"")+'"></i>').join("")
+    : "";
+  $("panel").classList.add("open");
+  $("p-body").scrollTop = 0;
+  ($("p-body").querySelector("input,button") || $("p-back")).focus();
+}
+
+function panelClose() {
+  $("panel").classList.remove("open");
+  if (lastFocus) { lastFocus.focus(); lastFocus = null; }
+}
+
+$("p-back").onclick = () => ($("p-back").dataset.act === "step" ? backStep() : panelClose());
+
+document.addEventListener("keydown", e => {
+  if (!$("panel").classList.contains("open")) return;
+  if (e.key === "Escape") { e.preventDefault(); $("p-back").click(); return; }
+  if (e.key !== "Tab") return;
+  const f = [...$("panel").querySelectorAll('button,input,[tabindex]:not([tabindex="-1"])')]
+    .filter(el => el.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length-1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+/* ================= detail ================= */
+
+function find(id) {
+  return DATA.entries.find(e => e.id === id) || DATA.pending.find(e => e.id === id) || null;
+}
+
+function openDetail(id) {
+  const e = find(id);
+  if (!e) return;
+  const rated = Boolean(e.scores);
+  const meta = [TIER_LABEL[e.tier], shortDate(e.visited_on)];
+
+  let body = '<div class="step">'
+    + (e.photo_url ? '<img class="hero" src="'+esc(e.photo_url)+'" alt="'+esc(e.name)+'">' : "")
+    + '<h3 class="d-name">'+esc(e.name)+'</h3>'
+    + '<p class="d-meta">'+meta.join(" &middot; ")+'</p>';
+
+  if (rated) {
+    body += '<p class="d-total">'+e.combined.toFixed(2)+'</p>'
+      + '<p class="d-sub">Combined &middot; weighted for '+TIER_LABEL[e.tier].toLowerCase()+'</p>'
+      + '<table class="grid"><caption class="sr">Scores by category</caption><thead><tr><th scope="col">Category</th>'
+      + e.scores.map(s => '<th scope="col" style="color:'+colour(idx(s.personId))+'">'
+          + esc(DATA.people[idx(s.personId)]?.name ?? "?")+'</th>').join("")
+      + '</tr></thead><tbody>'
+      + CATS.map(c => '<tr><th scope="row">'+c+'</th>'
+          + e.scores.map(s => '<td>'+s[c]+'</td>').join("")+'</tr>').join("")
+      + '</tbody><tfoot><tr><td>Weighted</td>'
+      + e.scores.map(s => '<td>'+s.total.toFixed(2)+'</td>').join("")+'</tr></tfoot></table>'
+      + (e.gap >= 1.5
+          ? '<p class="d-sub" style="color:var(--spark);margin-top:14px">You were '
+            + e.gap.toFixed(2)+' apart on this one.</p>' : "");
+  } else {
+    body += '<p class="d-total" style="color:var(--muted)">&mdash;</p>'
+      + '<p class="d-sub">'+esc(e.progress)+'</p>';
+  }
+  body += '</div>';
+
+  body = body.replace("</div>",
+      (e.order_note
+        ? '<div class="order"><span class="order-k">What to order</span>'
+          + esc(e.order_note) + '</div>'
+        : "")
+    + ((e.visits || []).length
+        ? '<p class="d-lab" style="font-family:var(--mono);font-size:10px;letter-spacing:.15em;'
+          + 'text-transform:uppercase;color:var(--muted);margin:24px 0 2px">Been '
+          + e.visits.length + (e.visits.length === 1 ? " time" : " times") + '</p>'
+          + '<div class="visits">' + e.visits.map(v =>
+              '<div class="visit-row"><span>' + esc(v.on_date) + '</span>'
+              + '<span>' + (ago(v.on_date) || "") + '</span></div>').join("")
+          + '</div>'
+        : "")
+    + "</div>");
+
+  const mine = (e.ratings || []).find(r => r.personId === ME);
+  const done = mine && CATS.every(c => mine[c] !== null);
+
+  panelClose();
+  panelOpen(e.name, body,
+    (rated ? '<button class="btn ghost" id="d-again">Been again</button>' : "")
+    + '<button class="btn ghost slim" id="d-del">Delete</button>'
+    + '<button class="btn" id="d-edit">'+(done ? "Edit" : "Rate it")+'</button>');
+  $("p-back").dataset.act = "close";
+
+  $("p-body").querySelectorAll("[data-editvisit]").forEach(b => b.onclick = () =>
+    openVisitForm(e, (e.visits || []).find(v => v.id === Number(b.dataset.editvisit))));
+
+  $("p-body").querySelectorAll("[data-visit]").forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try {
+      await api("visitDrop", {visitId: Number(b.dataset.visit)});
+      DATA = await api("list");
+      openDetail(e.id);
+      render();
+    } catch (err) { alert(err.message); b.disabled = false; }
+  });
+
+  // A repeat visit deliberately doesn't touch the score. Going back four times
+  // says something the rating can't, and mixing them makes both mean less.
+  if (rated) $("d-again").onclick = () => openVisitForm(e, null);
+  $("d-edit").onclick = () => openForm(e.id, done ? 0 : 2);
+  $("d-del").onclick = async () => {
+    if (!confirm("Delete " + e.name + ", and both your ratings of it?")) return;
+    await api("delete", {id: e.id});
+    DATA = await api("list");
+    panelClose();
+    render();
+  };
+}
+
+/**
+ * Logging a return visit. Defaults to today, but backfilling an old one has to
+ * be easy or the count stops being true.
+ */
+function openVisitForm(e, visit) {
+  const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+  const yday = new Date(Date.now() + 8 * 3600_000 - 86400000).toISOString().slice(0, 10);
+  const value = visit?.on_date ?? today;
+
+  panelClose();
+  panelOpen(visit ? "Change the date" : "Been again",
+    '<div class="step">'
+    + '<h3 class="q">' + esc(e.name) + '</h3>'
+    + '<p class="q-hint">When did you go' + (visit ? "" : " back") + '?</p>'
+    + '<div class="field"><label for="v-date">Date</label>'
+    + '<input type="date" id="v-date" value="' + value + '" max="' + today + '"></div>'
+    + '<div class="seg" id="v-quick">'
+    + '<button type="button" data-d="' + today + '">Today</button>'
+    + '<button type="button" data-d="' + yday + '">Yesterday</button>'
+    + '</div>'
+    + '<p class="q-hint" style="margin-top:18px">This doesn\u2019t change the score. '
+    + 'Going back says its own thing.</p>'
+    + '<p class="status" id="v-msg" role="status" aria-live="polite"></p></div>',
+    '<button class="btn ghost" id="v-cancel">Cancel</button>'
+    + '<button class="btn" id="v-save">' + (visit ? "Save" : "Log it") + '</button>');
+  $("p-back").dataset.act = "close";
+
+  $("v-quick").querySelectorAll("button").forEach(b =>
+    b.onclick = () => { $("v-date").value = b.dataset.d; });
+
+  $("v-cancel").onclick = () => openDetail(e.id);
+  $("v-save").onclick = async () => {
+    const on_date = $("v-date").value;
+    if (!on_date) { $("v-msg").textContent = "Pick a date."; return; }
+    $("v-save").disabled = true;
+    try {
+      if (visit) await api("visitUpdate", {visitId: visit.id, on_date});
+      else await api("visitAdd", {id: e.id, on_date});
+      DATA = await api("list");
+      openDetail(e.id);
+      render();
+    } catch (err) {
+      $("v-msg").style.color = "var(--spark)";
+      $("v-msg").textContent = err.message;
+      $("v-save").disabled = false;
+    }
+  };
+}
+
+/* ================= form: one question per screen ================= */
+
+let draft = null, step = 0;
+const STEPS = 3;
+
+function openForm(id, startStep = 0) {
+  const e = id === null ? null : find(id);
+  const mine = e ? ((e.ratings || []).find(r => r.personId === ME) || {}) : {};
+  draft = {
+    id: e?.id ?? null,
+    name: e?.name ?? "",
+    tier: e?.tier ?? "normal",
+    visited_on: e?.visited_on ?? "",
+    order_note: e?.order_note ?? "",
+    photo_url: e?.photo_url ?? null,
+    dataUrl: null,
+    cat: 0,
+    scores: Object.fromEntries(CATS.map(c => [c, mine[c] ?? null]))
+  };
+  step = startStep;
+  panelClose();
+  drawStep();
+}
+
+function backStep() {
+  if (step === 2 && draft.cat > 0) { draft.cat--; drawStep(); return; }
+  if (step > 0) { step--; drawStep(); return; }
+  panelClose();
+}
+
+function drawStep() {
+  const title = draft.id ? draft.name || "Edit" : "Add a place";
+  if (step === 0) drawDetails(title);
+  else if (step === 1) drawPhoto(title);
+  else drawRating(title);
+  $("p-back").dataset.act = "step";
+  $("p-back").setAttribute("aria-label", step === 0 ? "Cancel" : "Back");
+}
+
+function drawDetails(title) {
+  panelOpen(title,
+    '<div class="step">'
+    + '<h3 class="q">Where did you go?</h3>'
+    + '<p class="q-hint">The kind of place decides how the four scores get weighted.</p>'
+    + '<div class="field"><label for="f-name">Name</label>'
+    + '<input type="text" id="f-name" value="'+esc(draft.name)+'" enterkeyhint="next"'
+    + ' autocapitalize="words" placeholder="e.g. Burnt Ends"></div>'
+    + '<fieldset class="field"><legend class="legend">Kind of place</legend>'
+    + '<div class="seg" role="radiogroup" aria-label="Kind of place" id="f-tier">'
+    + TIERS.map(t => '<button role="radio" data-t="'+t+'" aria-checked="'+(t===draft.tier)+'">'
+        + '<b>'+TIER_LABEL[t]+'</b>'+TIER_NOTE[t]+'</button>').join("")
+    + '</div></fieldset>'
+    + '<div class="field"><label for="f-date">When (optional)</label>'
+    + '<input type="date" id="f-date" value="'+esc(draft.visited_on)+'"></div>'
+    + '<div class="field"><label for="f-order">What to order next time</label>'
+    + '<input type="text" id="f-order" value="'+esc(draft.order_note)+'"'
+    + ' placeholder="Bone marrow, skip the pasta"></div>'
+    + '<p class="status" id="f-note" role="status" aria-live="polite"></p></div>',
+    '<button class="btn" id="f-next">Next</button>',
+    {steps: STEPS, step: 0});
+
+  $("f-tier").querySelectorAll("button").forEach(b => b.onclick = () => {
+    draft.tier = b.dataset.t;
+    $("f-tier").querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-checked", String(x === b)));
+  });
+
+  $("f-next").onclick = () => {
+   try {
+    const name = $("f-name").value.trim();
+    if (!name) { $("f-note").textContent = "Give it a name first."; $("f-name").focus(); return; }
+    draft.name = name;
+    draft.visited_on = $("f-date").value || "";
+    draft.order_note = $("f-order")?.value.trim() ?? draft.order_note;
+    step = 1;
+    drawStep();
+   } catch (err) {
+    // Better a visible message than a button that silently does nothing.
+    $("f-note").style.color = "var(--spark)";
+    $("f-note").textContent = err.message;
+   }
+  };
+}
+
+function drawPhoto(title) {
+  panelOpen(title,
+    '<div class="step">'
+    + '<h3 class="q">Got a photo?</h3>'
+    + '<p class="q-hint">Only one of you needs to add it. Skip if you\u2019d rather not.</p>'
+    + '<button class="drop'+(draft.photo_url||draft.dataUrl?" has":"")+'" id="f-drop">'
+    + '<img id="f-thumb" src="'+esc(draft.dataUrl||draft.photo_url||"")+'" alt="">'
+    + '<span>Choose a photo</span></button>'
+    + '<input type="file" id="f-file" accept="image/*" class="sr">'
+    + '<p class="status" id="f-note" role="status" aria-live="polite"></p></div>',
+    '<button class="btn ghost" id="f-skip">Skip</button>'
+    + '<button class="btn" id="f-next">Next</button>',
+    {steps: STEPS, step: 1});
+
+  $("f-drop").onclick = () => $("f-file").click();
+  $("f-file").onchange = async () => {
+    const file = $("f-file").files[0];
+    if (!file) return;
+    const note = $("f-note");
+    note.style.color = "var(--muted)";
+    note.textContent = "Preparing\u2026";
+    try {
+      draft.dataUrl = await shrink(file);
+      $("f-thumb").src = draft.dataUrl;
+      $("f-drop").classList.add("has");
+      note.textContent = "";
+    } catch (err) {
+      note.style.color = "var(--spark)";
+      note.textContent = err.message;
+    }
+  };
+  $("f-skip").onclick = () => { step = 2; drawStep(); };
+  $("f-next").onclick = () => { step = 2; drawStep(); };
+}
+
+function drawRating(title) {
+  const c = CATS[draft.cat];
+  const last = draft.cat === CATS.length - 1;
+  panelOpen(title,
+    '<div class="step">'
+    + '<h3 class="q">'+c.charAt(0).toUpperCase()+c.slice(1)+'</h3>'
+    + '<p class="q-hint">'+HINT[c]+'</p>'
+    + '<div class="scale" role="radiogroup" aria-label="Score for '+c+'" id="f-scale">'
+    + Array.from({length:10}, (_,i) => {
+        const v = i+1, on = draft.scores[c] === v;
+        return '<button role="radio" data-v="'+v+'" aria-checked="'+on+'"'
+          + (on ? ' style="background:'+colour(idx(ME))+'"' : "")+'>'+v+'</button>';
+      }).join("")
+    + '</div>'
+    + '<p class="status" id="f-note" role="status" aria-live="polite"></p></div>',
+    '<button class="btn ghost" id="f-skipcat">Skip</button>'
+    + '<button class="btn" id="f-next">'+(last ? "Save" : "Next")+'</button>',
+    {steps: STEPS, step: 2});
+
+  $("f-scale").querySelectorAll("button").forEach(b => b.onclick = () => {
+    const v = Number(b.dataset.v);
+    draft.scores[c] = draft.scores[c] === v ? null : v;
+    $("f-scale").querySelectorAll("button").forEach(x => {
+      const on = Number(x.dataset.v) === draft.scores[c];
+      x.setAttribute("aria-checked", String(on));
+      x.style.background = on ? colour(idx(ME)) : "";
+    });
+    if (draft.scores[c] !== null && !last) { draft.cat++; drawStep(); }
+  });
+
+  $("f-skipcat").onclick = () => { last ? save() : (draft.cat++, drawStep()); };
+  $("f-next").onclick = () => { last ? save() : (draft.cat++, drawStep()); };
+}
+
+async function save() {
+  const note = $("f-note");
+  const btn = $("f-next");
+  note.style.color = "var(--muted)";
+  note.textContent = "Saving\u2026";
+  btn.disabled = true;
+  try {
+    let id = draft.id;
+    const date = draft.visited_on || null;
+    if (id) await api("update", {id, name: draft.name, tier: draft.tier, visited_on: date});
+    else id = (await api("add", {name: draft.name, tier: draft.tier, visited_on: date})).id;
+
+    if (draft.dataUrl) { note.textContent = "Uploading the photo\u2026"; await api("photo", {id, dataUrl: draft.dataUrl}); }
+    if (CATS.some(c => draft.scores[c] !== null)) await api("rate", {id, personId: ME, ...draft.scores});
+
+    DATA = await api("list");
+    panelClose();
+    render();
+  } catch (err) {
+    note.style.color = "var(--spark)";
+    note.textContent = err.message;
+    btn.disabled = false;
+  }
+}
+
+/* ================= boot ================= */
+
+(async () => {
+  if (TG) {
+    try {
+      const who = await api("whoami");
+      if (who.verified) {
+        ME = who.me;
+        DATA = await api("list");
+        start();
+        return;
+      }
+    } catch { /* fall through to the password */ }
+  }
+  if (!PW) { $("pw").focus(); return; }
+  try {
+    DATA = await api("list");
+    (ME && DATA.people.some(p => p.id === ME)) ? start() : showWho();
+  } catch {
+    localStorage.removeItem("makan.pw");
+    $("pw").focus();
+  }
+})();
+</script>
+</body>
+</html>
