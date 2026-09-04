@@ -122,6 +122,8 @@ Most of the time you'll want the app \u2014 <b>/site</b> opens it, and everythin
 <b>/list</b> \u2014 everything, with ids
 <b>/board</b> \u2014 print the leaderboard
 <b>/when <i>name</i> 2025-12-02</b> \u2014 set a date you skipped
+<b>/visit <i>name</i></b> \u2014 been again. Doesn't move the score.
+<b>/order <i>name</i> | <i>what to get</i></b> \u2014 note for next time
 <b>/remove <i>name</i></b> \u2014 delete an entry
 
 <b><u>Bookings</u></b>
@@ -638,6 +640,49 @@ export function createBot(env: Env): Bot {
     await deleteRestaurant(sb, restaurant.id);
     await refreshBoard(bot, sb, ctx.chat.id);
     return reply(ctx, `Removed <b>${escapeHtml(restaurant.name)}</b>.`);
+  });
+
+  // Repeat visits deliberately don't move the score.
+  bot.command(["visit", "beenagain"], async (ctx) => {
+    const ref = (ctx.match as string)?.trim();
+    if (!ref) return reply(ctx, "Usage: <code>/visit Odette</code>");
+    const restaurant = await findRestaurant(sb, ctx.chat.id, ref);
+    if (!restaurant) return reply(ctx, `Nothing matches "${escapeHtml(ref)}".`);
+
+    await sb.from("visits").insert({
+      restaurant_id: restaurant.id,
+      on_date: localDate(0),
+      by_id: ctx.from?.id ?? null,
+    });
+    const { data } = await sb.from("visits").select("id").eq("restaurant_id", restaurant.id);
+    const n = (data ?? []).length;
+    return reply(
+      ctx,
+      `Logged. You've been to <b>${escapeHtml(restaurant.name)}</b> ${n} time${n === 1 ? "" : "s"}.` +
+        "\n<i>Score unchanged \u2014 going back says its own thing.</i>"
+    );
+  });
+
+  bot.command("order", async (ctx) => {
+    const args = (ctx.match as string)?.trim() ?? "";
+    const [ref, ...rest] = args.split("|").map((x) => x.trim());
+    if (!ref) return reply(ctx, "Usage: <code>/order Odette | bone marrow, skip the pasta</code>");
+    const restaurant = await findRestaurant(sb, ctx.chat.id, ref);
+    if (!restaurant) return reply(ctx, `Nothing matches "${escapeHtml(ref)}".`);
+
+    const note = rest.join(" | ").trim();
+    if (!note) {
+      const { data } = await sb.from("restaurants").select("order_note")
+        .eq("id", restaurant.id).maybeSingle();
+      return reply(
+        ctx,
+        (data as any)?.order_note
+          ? `<b>${escapeHtml(restaurant.name)}</b>\n${escapeHtml((data as any).order_note)}`
+          : `Nothing noted for <b>${escapeHtml(restaurant.name)}</b> yet.`
+      );
+    }
+    await sb.from("restaurants").update({ order_note: note }).eq("id", restaurant.id);
+    return reply(ctx, `Noted for <b>${escapeHtml(restaurant.name)}</b>.`);
   });
 
   /* ---------------- want to eat ---------------- */
