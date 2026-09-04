@@ -223,6 +223,88 @@ export default async (request) => {
         return json({ ok: true });
       }
 
+      /* ---- repeat visits ---- */
+
+      case "visitAdd": {
+        const on_date = body.on_date || new Date(Date.now() + 8 * 3600_000)
+          .toISOString().slice(0, 10);
+        const { error } = await db.from("visits")
+          .insert({ restaurant_id: body.id, on_date, by_id: tgUser?.id ?? null });
+        if (error) return json({ error: error.message }, 400);
+        return json({ ok: true });
+      }
+
+      case "visitDrop":
+        await db.from("visits").delete().eq("id", body.visitId);
+        return json({ ok: true });
+
+      case "orderNote": {
+        const { error } = await db.from("restaurants")
+          .update({ order_note: body.order_note || null })
+          .eq("id", body.id).eq("chat_id", chatId());
+        if (error) return json({ error: error.message }, 400);
+        return json({ ok: true });
+      }
+
+      /* ---- upcoming ---- */
+
+      case "planAdd": {
+        const title = String(body.title ?? "").trim();
+        if (!title) return json({ error: "Needs a title" }, 400);
+        const { data, error } = await db.from("plans").insert({
+          chat_id: chatId(),
+          title,
+          kind: ["booking","tickets","trip","plan"].includes(body.kind) ? body.kind : "plan",
+          on_date: body.on_date || null,
+          at_time: body.at_time || null,
+          when_text: body.on_date ? null : (body.when_text || null),
+          note: body.note || null,
+          is_food: Boolean(body.is_food),
+        }).select().single();
+        if (error) return json({ error: error.message }, 400);
+        return json({ id: Number(data.id) });
+      }
+
+      case "planUpdate": {
+        const patch = {};
+        for (const k of ["title","kind","on_date","at_time","when_text","note","is_food","archived"]) {
+          if (body[k] !== undefined) patch[k] = body[k] === "" ? null : body[k];
+        }
+        if (patch.on_date) patch.when_text = null;
+        const { error } = await db.from("plans").update(patch).eq("id", body.id).eq("chat_id", chatId());
+        if (error) return json({ error: error.message }, 400);
+        return json({ ok: true });
+      }
+
+      case "planDrop":
+        await db.from("plans").delete().eq("id", body.id).eq("chat_id", chatId());
+        return json({ ok: true });
+
+      case "planPhoto": {
+        const m = String(body.dataUrl ?? "").match(/^data:(image\/[a-z+]+);base64,(.+)$/i);
+        if (!m) return json({ error: "That file isn't an image" }, 400);
+        const bytes = Buffer.from(m[2], "base64");
+        if (bytes.length > 4_000_000) return json({ error: "That image is too large" }, 413);
+
+        const ext = m[1].split("/")[1].replace("jpeg", "jpg");
+        const path = `plan-${body.id}-${Date.now()}.${ext}`;
+        const up = await db.storage.from("photos").upload(path, bytes, { contentType: m[1], upsert: true });
+        if (up.error) return json({ error: up.error.message }, 400);
+        const url = db.storage.from("photos").getPublicUrl(path).data.publicUrl;
+
+        const { data: plan } = await db.from("plans").select("photos").eq("id", body.id).maybeSingle();
+        const photos = [...((plan?.photos) ?? []), url];
+        await db.from("plans").update({ photos }).eq("id", body.id).eq("chat_id", chatId());
+        return json({ url, photos });
+      }
+
+      case "planPhotoDrop": {
+        const { data: plan } = await db.from("plans").select("photos").eq("id", body.id).maybeSingle();
+        const photos = ((plan?.photos) ?? []).filter((u) => u !== body.url);
+        await db.from("plans").update({ photos }).eq("id", body.id).eq("chat_id", chatId());
+        return json({ photos });
+      }
+
       /* ---- want to eat ---- */
 
       case "wantAdd": {
@@ -359,13 +441,23 @@ async function buildList(db) {
   const [{ data: places }, { data: people }] = await Promise.all([
     db
       .from("restaurants")
-      .select("id, name, tier, visited_on, photo_url, ratings(telegram_id, food, ambiance, aesthetics, service)")
+      .select("id, name, tier, visited_on, photo_url, order_note, ratings(telegram_id, food, ambiance, aesthetics, service), visits(id, on_date)")
       .eq("chat_id", chatId()),
     db.from("people").select("telegram_id, display_name"),
   ]);
 
   const roster = (people ?? []).map((p) => ({ id: Number(p.telegram_id), name: p.display_name }));
   const needed = Math.max(2, roster.length);
+
+  const { data: planRows } = await db
+    .from("plans")
+    .select("*")
+    .eq("chat_id", chatId())
+    .eq("archived", false)
+    .order("on_date", { ascending: true, nullsFirst: false });
+  const upcoming = (planRows ?? []).map((p) => ({
+    ...p, id: Number(p.id), photos: p.photos ?? [],
+  }));
 
   const { data: wishRows } = await db
     .from("wishlist")
@@ -385,13 +477,21 @@ async function buildList(db) {
     });
     const done = ratings.filter(complete);
 
+    const visits = (r.visits ?? [])
+      .map((v) => ({ id: Number(v.id), on_date: v.on_date }))
+      .sort((a, b) => b.on_date.localeCompare(a.on_date));
+
     const base = {
       id: Number(r.id),
       name: r.name,
       tier: r.tier,
       visited_on: r.visited_on,
       photo_url: r.photo_url,
+      order_note: r.order_note ?? null,
       ratings,
+      visits,
+      visitCount: visits.length,
+      lastVisit: visits[0]?.on_date ?? r.visited_on ?? null,
     };
 
     if (done.length < needed) {
@@ -429,5 +529,7 @@ async function buildList(db) {
   for (const tier of TIERS) counts[tier] = entries.filter((e) => e.tier === tier).length;
 
   counts.want = wishlist.length;
-  return { people: roster, entries, pending, wishlist, counts };
+  const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+  counts.upcoming = upcoming.filter((p) => !p.on_date || p.on_date >= today).length;
+  return { people: roster, entries, pending, wishlist, upcoming, counts };
 }
