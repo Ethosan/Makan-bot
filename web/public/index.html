@@ -90,7 +90,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .who.me{color:var(--ink);font-weight:500}
 .swatch{width:8px;height:8px;border-radius:50%;display:inline-block;vertical-align:middle;
   margin-right:5px;flex:none}
-.modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0 0}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 0}
 .modes button{min-height:38px;padding:0 10px;font-family:var(--mono);font-size:11px;
   letter-spacing:.09em;text-transform:uppercase;border:1px solid var(--rule);background:none;
   color:var(--muted);border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -130,6 +130,17 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .r-span{position:absolute;top:3.5px;height:2px;background:var(--ink);opacity:.3;border-radius:2px}
 .r-span.wide{background:var(--spark);opacity:.75}
 .r-dot{position:absolute;top:1px;width:7px;height:7px;border-radius:50%;margin-left:-3.5px}
+.times{flex:none;font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--muted);
+  border:1px solid var(--rule);border-radius:999px;padding:2px 6px}
+.order{background:var(--card);border-left:2px solid var(--brass);border-radius:0 4px 4px 0;
+  padding:12px 14px;margin-top:18px;font-size:14.5px;line-height:1.5}
+.order-k{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.visits{margin-top:8px}
+.visit-row{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);padding:8px 0;
+  border-bottom:1px dotted var(--rule)}
+.visit-row button{background:none;border:0;color:var(--muted);font:inherit;padding:4px 8px}
 .pend-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
   color:var(--muted);border:1px solid var(--rule);border-radius:999px;padding:3px 8px}
 .w-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;
@@ -187,6 +198,34 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .card-v b{color:var(--spark);font-weight:500}
 .s-foot{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--muted);border-top:1px solid var(--rule);padding-top:14px;margin-top:26px}
+/* ---- upcoming ---- */
+.month{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:baseline;gap:9px;margin:24px 0 2px;padding-top:12px;
+  border-top:1px solid var(--rule)}
+.month:first-child{margin-top:8px;border-top:0;padding-top:0}
+.month:after{content:"";flex:1;height:1px;background:var(--rule)}
+.plan{display:grid;grid-template-columns:46px minmax(0,1fr);gap:0 12px;width:100%;
+  padding:14px 0;border:0;border-bottom:1px solid var(--rule);background:none;text-align:left}
+.plan:last-child{border-bottom:0}
+.p-day{text-align:center;font-family:var(--mono);line-height:1.1}
+.p-day b{display:block;font-family:var(--serif);font-size:25px;font-weight:400}
+.p-day span{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.p-day.tbc b{font-size:19px;color:var(--rule)}
+.p-title{display:block;font-family:var(--serif);font-size:20px;line-height:1.2;
+  overflow-wrap:anywhere}
+.p-when{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);margin-top:4px}
+.p-note{display:block;font-size:13.5px;color:var(--muted);margin-top:5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-shots{display:flex;gap:5px;margin-top:9px}
+.p-shots img{width:44px;height:44px;object-fit:cover;border-radius:3px;background:var(--sink)}
+.p-shots span{align-self:center;font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+.p-past{opacity:.55}
+.shots{display:grid;gap:9px;margin-top:14px}
+.shots figure{margin:0;position:relative}
+.shots img{width:100%;border-radius:4px;display:block;background:var(--sink)}
+.shot-x{position:absolute;top:7px;right:7px;width:32px;height:32px;border-radius:50%;
+  border:0;background:rgba(25,30,25,.72);color:#F1F3EB;font-size:15px;line-height:1}
 .section{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
   color:var(--muted);margin:26px 0 2px;padding-top:12px;border-top:1px solid var(--rule)}
 .empty{font-family:var(--serif);font-size:22px;color:var(--muted);text-align:center;padding:60px 10px}
@@ -514,8 +553,21 @@ function thumb(e) {
     : '<div class="r-thumb none" aria-hidden="true">'+esc(e.name.trim()[0] || "?")+'</div>';
 }
 
+/** "3 wks ago" — the thing you actually want when deciding where to go. */
+function ago(dateStr) {
+  if (!dateStr) return null;
+  const days = Math.floor((Date.now() - new Date(dateStr + "T00:00:00")) / 86400000);
+  if (days < 0) return null;
+  if (days === 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 14) return days + " days ago";
+  if (days < 60) return Math.round(days / 7) + " wks ago";
+  if (days < 365) return Math.round(days / 30) + " mths ago";
+  return Math.round(days / 365) + "y ago";
+}
+
 function rowHtml(e, rank) {
-  const meta = [TIER_LABEL[e.tier], shortDate(e.visited_on)];
+  const meta = [TIER_LABEL[e.tier], ago(e.lastVisit) || shortDate(e.visited_on)];
   if (e.gap >= 1.5) meta.push("split " + e.gap.toFixed(1));
   const label = e.name + ", " + e.combined.toFixed(2) + " out of 10, " + TIER_LABEL[e.tier];
   return '<button class="row" data-open="'+e.id+'" aria-label="'+esc(label)+'">'
@@ -543,6 +595,7 @@ function pendHtml(e) {
 
 function render() {
   if (mode === "want") return renderWant();
+  if (mode === "upcoming") return renderUpcoming();
   const list = DATA.entries.filter(e => filter === "all" || e.tier === filter);
 
   renderKey();
@@ -582,9 +635,11 @@ function renderKey() {
 function renderNav() {
   // Want-to-eat is a different list, not a tier. Splitting them means four
   // short chips instead of five long ones, which fits without scrolling.
-  $("modes").innerHTML =
-    [["rated","Been " + (DATA.counts.all || 0)],["want","Want to eat " + (DATA.counts.want || 0)]]
-    .map(([m,l]) => '<button data-m="'+m+'" aria-pressed="'+(m===mode)+'">'+l+'</button>').join("");
+  $("modes").innerHTML = [
+      ["rated","Been " + (DATA.counts.all || 0)],
+      ["want","Want " + (DATA.counts.want || 0)],
+      ["upcoming","Upcoming " + (DATA.counts.upcoming || 0)],
+    ].map(([m,l]) => '<button data-m="'+m+'" aria-pressed="'+(m===mode)+'">'+l+'</button>').join("");
   $("modes").querySelectorAll("button").forEach(b =>
     b.onclick = () => { mode = b.dataset.m; render(); $("board").scrollTop = 0; });
 
@@ -644,6 +699,7 @@ function computeStats() {
             avg: inT.length ? inT.reduce((a, e) => a + e.combined, 0) / inT.length : 0};
   }).filter(t => t.n);
 
+  const returned = [...es].sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0))[0];
   const generous = [...per].sort((a, b) => b.avg - a.avg)[0];
   const harsh = [...per].sort((a, b) => a.avg - b.avg)[0];
 
@@ -651,6 +707,7 @@ function computeStats() {
     per, tiers,
     count: es.length,
     avg: es.reduce((a, e) => a + e.combined, 0) / es.length,
+    returned,
     widest: sorted[0],
     closest: sorted[sorted.length - 1],
     generous, harsh,
@@ -752,8 +809,12 @@ function openStats() {
  * distance above 4 makes an 8.9 about three times likelier than a 6.9.
  */
 function rollAgain() {
-  const pool = DATA.entries.filter(e => filter === "all" || e.tier === filter);
-  if (!pool.length) { alert("Nothing fully rated in that tier yet."); return; }
+  const all = DATA.entries.filter(e => filter === "all" || e.tier === filter);
+  if (!all.length) { alert("Nothing fully rated in that tier yet."); return; }
+  // Don't suggest last week's dinner. Falls back to everything if that empties it.
+  const cutoff = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const fresh = all.filter(e => !e.lastVisit || e.lastVisit < cutoff);
+  const pool = fresh.length ? fresh : all;
 
   const weights = pool.map(e => Math.pow(Math.max(0.1, e.combined - 4), 2));
   const total = weights.reduce((a, b) => a + b, 0);
@@ -800,6 +861,232 @@ function rollOne(tier = null) {
       render();
       openForm(id, 2);
     } catch (err) { alert(err.message); $("r-went").disabled = false; }
+  };
+}
+
+/* ================= upcoming ================= */
+
+const KINDS = ["booking","tickets","trip","plan"];
+const KIND_LABEL = {booking:"Booking", tickets:"Tickets", trip:"Trip", plan:"Plan"};
+const KIND_EMOJI = {booking:"\u{1F37D}\uFE0F", tickets:"\u{1F39F}\uFE0F", trip:"\u2708\uFE0F", plan:"\u{1F4CC}"};
+const MONTH_NAME = ["January","February","March","April","May","June",
+                    "July","August","September","October","November","December"];
+const todayStr = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+
+function planWhen(p) {
+  if (p.on_date) {
+    const d = new Date(p.on_date + "T00:00:00");
+    const day = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+    return day + (p.at_time ? " \u00b7 " + p.at_time : "");
+  }
+  return p.when_text || "date TBC";
+}
+
+function planHtml(p) {
+  const past = p.on_date && p.on_date < todayStr();
+  let day = '<span class="p-day tbc"><b>?</b><span>TBC</span></span>';
+  if (p.on_date) {
+    const d = new Date(p.on_date + "T00:00:00");
+    day = '<span class="p-day"><b>' + d.getDate() + '</b><span>'
+      + MONTH_NAME[d.getMonth()].slice(0,3) + '</span></span>';
+  }
+  const shots = p.photos.length
+    ? '<span class="p-shots">'
+      + p.photos.slice(0,3).map(u => '<img src="'+esc(u)+'" alt="" loading="lazy">').join("")
+      + (p.photos.length > 3 ? '<span>+'+(p.photos.length-3)+'</span>' : "")
+      + '</span>'
+    : "";
+  return '<button class="plan'+(past?" p-past":"")+'" data-plan="'+p.id+'" aria-label="'+esc(p.title)+'">'
+    + day
+    + '<span><span class="p-title">'+esc(p.title)+'</span>'
+    + '<span class="p-when">'+KIND_EMOJI[p.kind]+' '+esc(planWhen(p))+'</span>'
+    + (p.note ? '<span class="p-note">'+esc(p.note)+'</span>' : "")
+    + shots + '</span></button>';
+}
+
+function renderUpcoming() {
+  renderKey();
+  renderNav();
+  const all = DATA.upcoming ?? [];
+  const t = todayStr();
+  const soon = all.filter(p => !p.on_date || p.on_date >= t);
+  const past = all.filter(p => p.on_date && p.on_date < t).reverse();
+
+  let html = "";
+  if (!all.length) {
+    html = '<p class="empty">Nothing planned.<br>Add a date, or send the bot a screenshot.</p>';
+  } else {
+    // Grouped by month, undated last \u2014 plans usually start as "sometime in October".
+    let lastMonth = null;
+    for (const p of soon.filter(x => x.on_date)) {
+      const d = new Date(p.on_date + "T00:00:00");
+      const key = MONTH_NAME[d.getMonth()] + " " + d.getFullYear();
+      if (key !== lastMonth) { html += '<p class="month">'+key+'</p>'; lastMonth = key; }
+      html += planHtml(p);
+    }
+    const undated = soon.filter(x => !x.on_date);
+    if (undated.length) {
+      html += '<p class="month">No date yet</p>' + undated.map(planHtml).join("");
+    }
+    if (past.length) {
+      html += '<p class="month">Been and gone</p>' + past.map(planHtml).join("");
+    }
+  }
+  $("board").innerHTML = html;
+  $("board").querySelectorAll("[data-plan]").forEach(b =>
+    b.onclick = () => openPlan(Number(b.dataset.plan)));
+
+  $("app").querySelector(".bar").innerHTML = '<button class="btn" id="add">+ Add a plan</button>';
+  $("add").onclick = () => openPlanForm(null);
+}
+
+function openPlan(id) {
+  const p = (DATA.upcoming ?? []).find(x => x.id === id);
+  if (!p) return;
+  const past = p.on_date && p.on_date < todayStr();
+
+  let body = '<div class="step">'
+    + '<p class="d-meta">'+KIND_EMOJI[p.kind]+' '+KIND_LABEL[p.kind]+'</p>'
+    + '<h3 class="d-name">'+esc(p.title)+'</h3>'
+    + '<p class="d-sub">'+esc(p.on_date ? p.on_date + (p.at_time ? " \u00b7 " + p.at_time : "")
+        : (p.when_text || "date TBC"))+'</p>'
+    + (p.note ? '<p style="margin-top:16px">'+esc(p.note)+'</p>' : "")
+    + (p.photos.length
+        ? '<div class="shots">'+p.photos.map(u =>
+            '<figure><img src="'+esc(u)+'" alt=""></figure>').join("")+'</div>'
+        : '<p class="q-hint" style="margin-top:18px">No screenshots attached yet.</p>')
+    + '</div>';
+
+  panelClose();
+  panelOpen(p.title, body,
+    (past && p.is_food ? '<button class="btn ghost" id="pl-rate">Add to the list</button>' : "")
+    + '<button class="btn ghost slim" id="pl-del">Delete</button>'
+    + '<button class="btn" id="pl-edit">Edit</button>');
+  $("p-back").dataset.act = "close";
+
+  $("pl-edit").onclick = () => openPlanForm(p);
+  $("pl-del").onclick = async () => {
+    if (!confirm("Delete " + p.title + "?")) return;
+    await api("planDrop", {id: p.id});
+    DATA = await api("list");
+    panelClose(); render();
+  };
+  // A booking that's been and gone is a place you can now rate.
+  if (past && p.is_food) $("pl-rate").onclick = async () => {
+    try {
+      const {id} = await api("add", {name: p.title, tier: "normal", visited_on: p.on_date});
+      await api("planUpdate", {id: p.id, archived: true});
+      DATA = await api("list");
+      mode = "rated"; filter = "all";
+      panelClose(); render();
+      openForm(id, 2);
+    } catch (err) { alert(err.message); }
+  };
+}
+
+function openPlanForm(p) {
+  let kind = p?.kind ?? "plan";
+  let pending = [];
+
+  panelClose();
+  panelOpen(p ? "Edit" : "Add a plan",
+    '<div class="step">'
+    + '<div class="field"><label for="pf-title">What is it?</label>'
+    + '<input type="text" id="pf-title" value="'+esc(p?.title ?? "")+'" autocapitalize="words"'
+    + ' placeholder="Dinner at Odette"></div>'
+    + '<fieldset class="field"><legend class="legend">Kind</legend>'
+    + '<div class="seg" role="radiogroup" aria-label="Kind" id="pf-kind">'
+    + KINDS.map(k => '<button role="radio" data-k="'+k+'" aria-checked="'+(k===kind)+'">'
+        + '<b>'+KIND_EMOJI[k]+'</b>'+KIND_LABEL[k]+'</button>').join("")
+    + '</div></fieldset>'
+    + '<div class="field"><label for="pf-date">Date, if you know it</label>'
+    + '<input type="date" id="pf-date" value="'+esc(p?.on_date ?? "")+'"></div>'
+    + '<div class="field"><label for="pf-time">Time (however you like)</label>'
+    + '<input type="text" id="pf-time" value="'+esc(p?.at_time ?? "")+'" placeholder="7.30pm, doors 8"></div>'
+    + '<div class="field"><label for="pf-rough">Or roughly when</label>'
+    + '<input type="text" id="pf-rough" value="'+esc(p?.when_text ?? "")+'" placeholder="mid-October, TBC"></div>'
+    + '<div class="field"><label for="pf-note">Notes</label>'
+    + '<input type="text" id="pf-note" value="'+esc(p?.note ?? "")+'" placeholder="under Ethan, 2 pax"></div>'
+    + '<div class="field"><label>Screenshots</label>'
+    + '<div class="shots" id="pf-shots"></div>'
+    + '<button class="btn ghost" id="pf-pick" style="margin-top:10px">+ Add a screenshot</button>'
+    + '<input type="file" id="pf-file" accept="image/*" multiple class="sr"></div>'
+    + '<p class="status" id="pf-note-msg" role="status" aria-live="polite"></p></div>',
+    '<button class="btn ghost" id="pf-cancel">Cancel</button>'
+    + '<button class="btn" id="pf-save">Save</button>');
+  $("p-back").dataset.act = "close";
+
+  const drawShots = () => {
+    const existing = (p?.photos ?? []).map(u =>
+      '<figure><img src="'+esc(u)+'" alt=""><button class="shot-x" data-rm="'+esc(u)+'" '
+      + 'aria-label="Remove">\u2715</button></figure>').join("");
+    const fresh = pending.map((d,i) =>
+      '<figure><img src="'+d+'" alt=""><button class="shot-x" data-new="'+i+'" '
+      + 'aria-label="Remove">\u2715</button></figure>').join("");
+    $("pf-shots").innerHTML = existing + fresh;
+    $("pf-shots").querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => {
+      await api("planPhotoDrop", {id: p.id, url: b.dataset.rm});
+      p.photos = p.photos.filter(u => u !== b.dataset.rm);
+      drawShots();
+    });
+    $("pf-shots").querySelectorAll("[data-new]").forEach(b => b.onclick = () => {
+      pending.splice(Number(b.dataset.new), 1); drawShots();
+    });
+  };
+  drawShots();
+
+  $("pf-kind").querySelectorAll("button").forEach(b => b.onclick = () => {
+    kind = b.dataset.k;
+    $("pf-kind").querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-checked", String(x === b)));
+  });
+
+  $("pf-pick").onclick = () => $("pf-file").click();
+  $("pf-file").onchange = async () => {
+    const msg = $("pf-note-msg");
+    msg.style.color = "var(--muted)";
+    msg.textContent = "Preparing\u2026";
+    for (const f of [...$("pf-file").files]) {
+      try { pending.push(await shrink(f)); }
+      catch { msg.style.color = "var(--spark)"; msg.textContent = "One of those wasn't an image."; }
+    }
+    msg.textContent = "";
+    drawShots();
+  };
+
+  $("pf-cancel").onclick = panelClose;
+  $("pf-save").onclick = async () => {
+    const msg = $("pf-note-msg");
+    const title = $("pf-title").value.trim();
+    if (!title) { msg.style.color = "var(--spark)"; msg.textContent = "Give it a title."; return; }
+    $("pf-save").disabled = true;
+    msg.style.color = "var(--muted)";
+    msg.textContent = "Saving\u2026";
+    try {
+      const payload = {
+        title, kind,
+        on_date: $("pf-date").value || null,
+        at_time: $("pf-time").value.trim() || null,
+        when_text: $("pf-rough").value.trim() || null,
+        note: $("pf-note").value.trim() || null,
+        is_food: kind === "booking",
+      };
+      let id = p?.id;
+      if (id) await api("planUpdate", {id, ...payload});
+      else id = (await api("planAdd", payload)).id;
+
+      for (let i = 0; i < pending.length; i++) {
+        msg.textContent = "Uploading " + (i+1) + " of " + pending.length + "\u2026";
+        await api("planPhoto", {id, dataUrl: pending[i]});
+      }
+      DATA = await api("list");
+      panelClose();
+      render();
+    } catch (err) {
+      msg.style.color = "var(--spark)";
+      msg.textContent = err.message;
+      $("pf-save").disabled = false;
+    }
   };
 }
 
@@ -981,15 +1268,43 @@ function openDetail(id) {
   }
   body += '</div>';
 
+  body = body.replace("</div>",
+      (e.order_note
+        ? '<div class="order"><span class="order-k">What to order</span>'
+          + esc(e.order_note) + '</div>'
+        : "")
+    + ((e.visits || []).length
+        ? '<p class="d-lab" style="font-family:var(--mono);font-size:10px;letter-spacing:.15em;'
+          + 'text-transform:uppercase;color:var(--muted);margin:24px 0 2px">Been '
+          + e.visits.length + (e.visits.length === 1 ? " time" : " times") + '</p>'
+          + '<div class="visits">' + e.visits.map(v =>
+              '<div class="visit-row"><span>' + esc(v.on_date) + '</span>'
+              + '<span>' + (ago(v.on_date) || "") + '</span></div>').join("")
+          + '</div>'
+        : "")
+    + "</div>");
+
   const mine = (e.ratings || []).find(r => r.personId === ME);
   const done = mine && CATS.every(c => mine[c] !== null);
 
   panelClose();
   panelOpen(e.name, body,
-    '<button class="btn ghost slim" id="d-del">Delete</button>'
+    (rated ? '<button class="btn ghost" id="d-again">Been again</button>' : "")
+    + '<button class="btn ghost slim" id="d-del">Delete</button>'
     + '<button class="btn" id="d-edit">'+(done ? "Edit" : "Rate it")+'</button>');
   $("p-back").dataset.act = "close";
 
+  // A repeat visit deliberately doesn't touch the score. Going back four times
+  // says something the rating can't, and mixing them makes both mean less.
+  if (rated) $("d-again").onclick = async () => {
+    $("d-again").disabled = true;
+    try {
+      await api("visitAdd", {id: e.id});
+      DATA = await api("list");
+      openDetail(e.id);
+      render();
+    } catch (err) { alert(err.message); $("d-again").disabled = false; }
+  };
   $("d-edit").onclick = () => openForm(e.id, done ? 0 : 2);
   $("d-del").onclick = async () => {
     if (!confirm("Delete " + e.name + ", and both your ratings of it?")) return;
@@ -1013,6 +1328,7 @@ function openForm(id, startStep = 0) {
     name: e?.name ?? "",
     tier: e?.tier ?? "normal",
     visited_on: e?.visited_on ?? "",
+    order_note: e?.order_note ?? "",
     photo_url: e?.photo_url ?? null,
     dataUrl: null,
     cat: 0,
@@ -1068,6 +1384,7 @@ function drawDetails(title) {
     if (!name) { $("f-note").textContent = "Give it a name first."; $("f-name").focus(); return; }
     draft.name = name;
     draft.visited_on = $("f-date").value || "";
+    draft.order_note = $("f-order").value.trim();
     step = 1;
     drawStep();
   };
