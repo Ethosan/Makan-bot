@@ -1369,6 +1369,9 @@ function drawDetails(title) {
     + '</div></fieldset>'
     + '<div class="field"><label for="f-date">When (optional)</label>'
     + '<input type="date" id="f-date" value="'+esc(draft.visited_on)+'"></div>'
+    + '<div class="field"><label for="f-order">What to order next time</label>'
+    + '<input type="text" id="f-order" value="'+esc(draft.order_note)+'"'
+    + ' placeholder="Bone marrow, skip the pasta"></div>'
     + '<p class="status" id="f-note" role="status" aria-live="polite"></p></div>',
     '<button class="btn" id="f-next">Next</button>',
     {steps: STEPS, step: 0});
@@ -1380,13 +1383,19 @@ function drawDetails(title) {
   });
 
   $("f-next").onclick = () => {
+   try {
     const name = $("f-name").value.trim();
     if (!name) { $("f-note").textContent = "Give it a name first."; $("f-name").focus(); return; }
     draft.name = name;
     draft.visited_on = $("f-date").value || "";
-    draft.order_note = $("f-order").value.trim();
+    draft.order_note = $("f-order")?.value.trim() ?? draft.order_note;
     step = 1;
     drawStep();
+   } catch (err) {
+    // Better a visible message than a button that silently does nothing.
+    $("f-note").style.color = "var(--spark)";
+    $("f-note").textContent = err.message;
+   }
   };
 }
 
