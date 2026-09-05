@@ -413,6 +413,8 @@ export default async (request) => {
       }
 
       case "photo": {
+        // slot decides which of the two images this is.
+        const slot = body.slot === "logo" ? "logo" : "food";
         // dataUrl comes from a FileReader in the browser.
         const m = String(body.dataUrl ?? "").match(/^data:(image\/[a-z+]+);base64,(.+)$/i);
         if (!m) return json({ error: "That file isn't an image" }, 400);
@@ -423,21 +425,27 @@ export default async (request) => {
         }
 
         const ext = m[1].split("/")[1].replace("jpeg", "jpg");
-        const path = `${body.id}-${Date.now()}.${ext}`;
+        const path = `${slot}-${body.id}-${Date.now()}.${ext}`;
         const { error } = await db.storage
           .from("photos")
           .upload(path, bytes, { contentType: m[1], upsert: true });
         if (error) return json({ error: error.message }, 400);
 
         const { data } = db.storage.from("photos").getPublicUrl(path);
-        await db.from("restaurants").update({ photo_url: data.publicUrl }).eq("id", body.id);
-        return json({ photo_url: data.publicUrl });
+        const column = slot === "logo" ? "logo_url" : "photo_url";
+        await db.from("restaurants").update({ [column]: data.publicUrl })
+          .eq("id", body.id).eq("chat_id", chatId());
+        return json({ url: data.publicUrl, slot });
       }
 
-      case "unphoto":
-        await db.from("restaurants").update({ photo_url: null, photo_file_id: null }).eq("id", body.id);
+      case "unphoto": {
+        const patch = body.slot === "logo"
+          ? { logo_url: null, logo_file_id: null }
+          : { photo_url: null, photo_file_id: null };
+        await db.from("restaurants").update(patch).eq("id", body.id).eq("chat_id", chatId());
         await pingBot();
         return json({ ok: true });
+      }
 
       default:
         return json({ error: "Unknown action" }, 400);
@@ -451,7 +459,7 @@ async function buildList(db) {
   const [{ data: places }, { data: people }] = await Promise.all([
     db
       .from("restaurants")
-      .select("id, name, tier, visited_on, photo_url, order_note, ratings(telegram_id, food, ambiance, aesthetics, service), visits(id, on_date)")
+      .select("id, name, tier, visited_on, photo_url, logo_url, order_note, ratings(telegram_id, food, ambiance, aesthetics, service), visits(id, on_date)")
       .eq("chat_id", chatId()),
     db.from("people").select("telegram_id, display_name"),
   ]);
@@ -497,6 +505,7 @@ async function buildList(db) {
       tier: r.tier,
       visited_on: r.visited_on,
       photo_url: r.photo_url,
+      logo_url: r.logo_url ?? null,
       order_note: r.order_note ?? null,
       ratings,
       visits,
