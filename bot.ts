@@ -122,7 +122,7 @@ Most of the time you'll want the app \u2014 <b>/site</b> opens it, and everythin
 <b>/list</b> \u2014 everything, with ids
 <b>/board</b> \u2014 print the leaderboard
 <b>/when <i>name</i> 2025-12-02</b> \u2014 set a date you skipped
-<b>/visit <i>name</i></b> \u2014 been again. Doesn't move the score.
+<b>/visit <i>name</i> | 120 | me</b> \u2014 been again. Bill and payer optional; leave the payer out if you split. Doesn't move the score.
 <b>/order <i>name</i> | <i>what to get</i></b> \u2014 note for next time
 <b>/remove <i>name</i></b> \u2014 delete an entry
 
@@ -658,15 +658,24 @@ export function createBot(env: Env): Bot {
 
   // Repeat visits deliberately don't move the score.
   bot.command(["visit", "beenagain"], async (ctx) => {
-    const ref = (ctx.match as string)?.trim();
-    if (!ref) return reply(ctx, "Usage: <code>/visit Odette</code>");
+    const raw = (ctx.match as string)?.trim();
+    const ref = raw?.split("|")[0].trim();
+    if (!ref) return reply(ctx, "Usage: <code>/visit Odette</code>, or <code>/visit Odette | 120 | me</code>");
     const restaurant = await findRestaurant(sb, ctx.chat.id, ref);
     if (!restaurant) return reply(ctx, `Nothing matches "${escapeHtml(ref)}".`);
+
+    // Optional bill: /visit Odette | 120  (add "me" to say you paid it)
+    const [, ...rest] = (ctx.match as string).split("|").map((x) => x.trim());
+    const tail = rest.join(" ");
+    const money = tail.match(/(\d+(?:\.\d{1,2})?)/);
+    const iPaid = /\b(me|mine|i did)\b/i.test(tail);
 
     await sb.from("visits").insert({
       restaurant_id: restaurant.id,
       on_date: localDate(0),
       by_id: ctx.from?.id ?? null,
+      amount: money ? Number(money[1]) : null,
+      paid_by: iPaid ? ctx.from?.id ?? null : null,
     });
     const { data } = await sb.from("visits").select("id").eq("restaurant_id", restaurant.id);
     const n = (data ?? []).length;
