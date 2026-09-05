@@ -22,6 +22,13 @@ const WEIGHTS = {
  *  the pinned Telegram board always show the same list. */
 const chatId = () => Number(process.env.CHAT_ID ?? 0);
 
+/** Money is optional everywhere; anything unparseable becomes null, not zero. */
+function amountOf(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(String(v).replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+}
+
 /**
  * When the site is opened as a Telegram Mini App, Telegram signs a blob telling
  * us exactly who the user is. Verifying it against the bot token is real
@@ -228,8 +235,14 @@ export default async (request) => {
       case "visitAdd": {
         const on_date = body.on_date || new Date(Date.now() + 8 * 3600_000)
           .toISOString().slice(0, 10);
-        const { error } = await db.from("visits")
-          .insert({ restaurant_id: body.id, on_date, by_id: tgUser?.id ?? null });
+        const { error } = await db.from("visits").insert({
+          restaurant_id: body.id,
+          on_date,
+          by_id: tgUser?.id ?? null,
+          amount: amountOf(body.amount),
+          // null means split evenly.
+          paid_by: body.paid_by ? Number(body.paid_by) : null,
+        });
         if (error) return json({ error: error.message }, 400);
         return json({ ok: true });
       }
@@ -238,8 +251,11 @@ export default async (request) => {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.on_date ?? ""))) {
           return json({ error: "Needs a date" }, 400);
         }
-        const { error } = await db.from("visits")
-          .update({ on_date: body.on_date }).eq("id", body.visitId);
+        const { error } = await db.from("visits").update({
+          on_date: body.on_date,
+          amount: amountOf(body.amount),
+          paid_by: body.paid_by ? Number(body.paid_by) : null,
+        }).eq("id", body.visitId);
         if (error) return json({ error: error.message }, 400);
         return json({ ok: true });
       }
@@ -459,7 +475,7 @@ async function buildList(db) {
   const [{ data: places }, { data: people }] = await Promise.all([
     db
       .from("restaurants")
-      .select("id, name, tier, visited_on, photo_url, logo_url, order_note, ratings(telegram_id, food, ambiance, aesthetics, service), visits(id, on_date)")
+      .select("id, name, tier, visited_on, photo_url, logo_url, order_note, ratings(telegram_id, food, ambiance, aesthetics, service), visits(id, on_date, amount, paid_by)")
       .eq("chat_id", chatId()),
     db.from("people").select("telegram_id, display_name"),
   ]);
@@ -496,8 +512,14 @@ async function buildList(db) {
     const done = ratings.filter(complete);
 
     const visits = (r.visits ?? [])
-      .map((v) => ({ id: Number(v.id), on_date: v.on_date }))
+      .map((v) => ({
+        id: Number(v.id),
+        on_date: v.on_date,
+        amount: v.amount === null || v.amount === undefined ? null : Number(v.amount),
+        paid_by: v.paid_by === null || v.paid_by === undefined ? null : Number(v.paid_by),
+      }))
       .sort((a, b) => b.on_date.localeCompare(a.on_date));
+    const priced = visits.filter((v) => v.amount !== null);
 
     const base = {
       id: Number(r.id),
@@ -511,6 +533,9 @@ async function buildList(db) {
       visits,
       visitCount: visits.length,
       lastVisit: visits[0]?.on_date ?? r.visited_on ?? null,
+      avgSpend: priced.length
+        ? priced.reduce((a, v) => a + v.amount, 0) / priced.length
+        : null,
     };
 
     if (done.length < needed) {
