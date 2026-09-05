@@ -9,6 +9,8 @@ export interface Restaurant {
   visited_on: string | null;
   photo_file_id: string | null;
   photo_url: string | null;
+  logo_file_id: string | null;
+  logo_url: string | null;
   card_message_id: number | null;
 }
 
@@ -173,9 +175,14 @@ export async function setPhoto(
   sb: SupabaseClient,
   id: number,
   fileId: string | null,
-  url?: string | null
+  url?: string | null,
+  slot: "food" | "logo" = "food"
 ) {
-  await sb.from("restaurants").update({ photo_file_id: fileId, photo_url: url ?? null }).eq("id", id);
+  const patch: Record<string, unknown> =
+    slot === "logo"
+      ? { logo_file_id: fileId, logo_url: url ?? null }
+      : { photo_file_id: fileId, photo_url: url ?? null };
+  await sb.from("restaurants").update(patch).eq("id", id);
 }
 
 /**

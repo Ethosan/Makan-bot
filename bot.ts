@@ -152,6 +152,7 @@ Most of the time you'll want the app \u2014 <b>/site</b> opens it, and everythin
 
 <b><u>Photos</u></b>
 Reply to any card with a photo, or send one captioned <code>/photo <i>name</i></code>. Only one of you needs to.
+Send the logo captioned <code>/logo <i>name</i></code> \u2014 that's what shows in the list.
 <b>/unphoto <i>name</i></b> \u2014 take it off again
 
 <b><u>Setup</u></b>
@@ -488,13 +489,18 @@ export function createBot(env: Env): Bot {
     }
 
     const caption = ctx.message.caption ?? "";
-    const m = caption.match(/^\/photo(?:@\S+)?\s+(.+)$/i);
+    const m = caption.match(/^\/(photo|logo)(?:@\S+)?\s+(.+)$/i);
     if (m) {
-      const restaurant = await findRestaurant(sb, ctx.chat.id, m[1]);
+      const slot = m[1].toLowerCase() === "logo" ? "logo" : "food";
+      const restaurant = await findRestaurant(sb, ctx.chat.id, m[2]);
       if (!restaurant) {
-        return reply(ctx, `Nothing matches "${escapeHtml(m[1])}".`);
+        return reply(ctx, `Nothing matches "${escapeHtml(m[2])}".`);
       }
-      await setPhoto(sb, restaurant.id, fileId, await mirrorToStorage(sb, env, fileId, restaurant.id));
+      const url = await mirrorToStorage(sb, env, fileId, restaurant.id);
+      await setPhoto(sb, restaurant.id, fileId, url, slot);
+      if (slot === "logo") {
+        return reply(ctx, `Logo set for <b>${escapeHtml(restaurant.name)}</b>.`);
+      }
       await replaceCard(ctx.chat.id, threadId, { ...restaurant, photo_file_id: fileId });
       return;
     }
@@ -506,6 +512,14 @@ export function createBot(env: Env): Bot {
     reply(
       ctx,
       "Send the photo with <code>/photo Odette</code> as its caption, or just reply to that place's card with a photo."
+    )
+  );
+
+  // The logo is what fronts the list, so it gets its own command.
+  bot.command("logo", (ctx) =>
+    reply(
+      ctx,
+      "Send the logo with <code>/logo Odette</code> as its caption, or reply to that place's card with one and add <code>logo</code> to the caption."
     )
   );
 
