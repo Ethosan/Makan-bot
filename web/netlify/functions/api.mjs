@@ -20,7 +20,72 @@ const WEIGHTS = {
 
 /** The group this site is bound to. Everything is scoped to it, so the site and
  *  the pinned Telegram board always show the same list. */
-const chatId = () => Number(process.env.CHAT_ID ?? 0);
+/** Fallback tenant, used only by the original shared-password path. */
+const legacyChatId = () => Number(process.env.CHAT_ID ?? 0);
+
+/** Web-only pairs get positive ids; Telegram groups are always negative. */
+function newPairId() {
+  return 1_000_000_000_000 + Math.floor(Math.random() * 900_000_000_000);
+}
+
+/**
+ * Every member needs a stable numeric id, because that's what a rating is keyed
+ * by. Telegram members reuse their Telegram id so nothing has to move; web-only
+ * members get one well clear of that range.
+ */
+async function addMember(db, row) {
+  const { data } = await db.from("members").insert(row).select().single();
+  const person_id = row.telegram_id ?? 900000000000 + Number(data.id);
+  await db.from("members").update({ person_id }).eq("id", data.id);
+  // The bot reads names out of `people`, so keep it in step.
+  await db.from("people").upsert({ telegram_id: person_id, display_name: row.display_name });
+  return person_id;
+}
+
+function inviteUrl(request, code) {
+  const origin = new URL(request.url).origin;
+  return `${origin}/?join=${code}`;
+}
+
+function newInviteCode() {
+  // No 0/O/1/I — these get read aloud and typed by hand.
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 6 }, () =>
+    alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+}
+
+/**
+ * Three ways to prove who you are, in order of strength:
+ *   1. Telegram Mini App  — signed by Telegram, tells us the telegram_id
+ *   2. Supabase session   — an email account on the website
+ *   3. The shared password — the original ETAL setup, kept working as-is
+ * Returns the tenant and the member, or null.
+ */
+async function identify(db, body) {
+  const tg = verifyInitData(body.initData);
+  if (tg) {
+    const { data } = await db.from("members").select("*").eq("telegram_id", tg.id).maybeSingle();
+    if (data) return { chat_id: Number(data.chat_id), member: data, via: "telegram" };
+    // Known to the bot but not yet in a pair.
+    return { chat_id: null, member: null, via: "telegram", telegram: tg };
+  }
+
+  if (body.accessToken) {
+    const { data: userRes } = await db.auth.getUser(body.accessToken);
+    const user = userRes?.user;
+    if (user) {
+      const { data } = await db.from("members").select("*").eq("auth_id", user.id).maybeSingle();
+      if (data) return { chat_id: Number(data.chat_id), member: data, via: "email", user };
+      return { chat_id: null, member: null, via: "email", user };
+    }
+  }
+
+  if (process.env.SITE_PASSWORD && body.password === process.env.SITE_PASSWORD) {
+    return { chat_id: legacyChatId(), member: null, via: "password" };
+  }
+
+  return null;
+}
 
 /** Money is optional everywhere; anything unparseable becomes null, not zero. */
 function amountOf(v) {
@@ -121,6 +186,16 @@ async function pingBot() {
   }
 }
 
+async function pairInvite(db, chat_id, request) {
+  const { data } = await db.from("pairs").select("invite_code").eq("chat_id", chat_id).maybeSingle();
+  return data?.invite_code ? inviteUrl(request, data.invite_code) : null;
+}
+
+async function pairIsFull(db, chat_id) {
+  const { data } = await db.from("members").select("id").eq("chat_id", chat_id);
+  return (data ?? []).length >= 2;
+}
+
 export default async (request) => {
   if (request.method !== "POST") return json({ error: "POST only" }, 405);
 
@@ -133,26 +208,92 @@ export default async (request) => {
 
   // Two ways in. Inside Telegram we know exactly who this is; in a plain
   // browser the shared password gets you in and you say who you are.
-  const tgUser = verifyInitData(body.initData);
-  if (!tgUser && body.password !== process.env.SITE_PASSWORD) {
-    return json({ error: "Wrong password" }, 401);
-  }
-
   const db = sb();
 
-  if (body.action === "whoami") {
-    return json({ verified: Boolean(tgUser), me: tgUser?.id ?? null });
+  // The client needs these to run Supabase auth in the browser.
+  if (body.action === "config") {
+    return json({
+      supabaseUrl: process.env.SUPABASE_URL,
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? null,
+      passwordEnabled: Boolean(process.env.SITE_PASSWORD),
+    });
   }
 
-  // A verified Telegram user can only ever write their own scores.
-  if (tgUser && body.personId && Number(body.personId) !== tgUser.id) {
+  const who = await identify(db, body);
+  if (!who) return json({ error: "Wrong password" }, 401);
+
+  const tgUser = who.via === "telegram" ? (who.telegram ?? { id: who.member?.telegram_id }) : null;
+  const chatId = () => who.chat_id;
+
+  if (body.action === "whoami") {
+    return json({
+      verified: who.via !== "password",
+      via: who.via,
+      me: who.member?.person_id ? Number(who.member.person_id)
+          : who.member?.telegram_id ? Number(who.member.telegram_id)
+          : (tgUser?.id ?? null),
+      memberId: who.member?.id ?? null,
+      inPair: who.chat_id !== null,
+      name: who.member?.display_name ?? who.user?.email ?? null,
+      invite_url: who.chat_id ? await pairInvite(db, who.chat_id, request) : null,
+      partnered: who.chat_id ? await pairIsFull(db, who.chat_id) : false,
+    });
+  }
+
+  /* ---- joining and creating pairs ---- */
+
+  if (body.action === "createPair") {
+    if (who.chat_id) return json({ error: "You're already in a pair" }, 400);
+    const name = String(body.displayName ?? "").trim();
+    if (!name) return json({ error: "Needs your name" }, 400);
+
+    const chat_id = newPairId();
+    const invite_code = newInviteCode();
+    const { error } = await db.from("pairs")
+      .insert({ chat_id, name: body.pairName || null, invite_code });
+    if (error) return json({ error: error.message }, 400);
+
+    const person_id = await addMember(db, {
+      chat_id, auth_id: who.user?.id ?? null, telegram_id: tgUser?.id ?? null, display_name: name,
+    });
+    return json({ chat_id, invite_code, person_id, invite_url: inviteUrl(request, invite_code) });
+  }
+
+  if (body.action === "joinPair") {
+    if (who.chat_id) return json({ error: "You're already in a pair" }, 400);
+    const code = String(body.code ?? "").trim().toUpperCase();
+    const name = String(body.displayName ?? "").trim();
+    if (!code || !name) return json({ error: "Needs the code and your name" }, 400);
+
+    const { data: pair } = await db.from("pairs").select("chat_id")
+      .eq("invite_code", code).maybeSingle();
+    if (!pair) return json({ error: "No pair with that code" }, 404);
+
+    const { data: existing } = await db.from("members").select("id").eq("chat_id", pair.chat_id);
+    if ((existing ?? []).length >= 2) return json({ error: "That pair is full" }, 400);
+
+    const person_id = await addMember(db, {
+      chat_id: Number(pair.chat_id),
+      auth_id: who.user?.id ?? null,
+      telegram_id: tgUser?.id ?? null,
+      display_name: name,
+    });
+    return json({ chat_id: Number(pair.chat_id), person_id });
+  }
+
+  if (who.chat_id === null) {
+    return json({ error: "Not in a pair yet", needsPair: true }, 403);
+  }
+
+  // Nobody can write someone else's scores.
+  if (tgUser?.id && body.personId && Number(body.personId) !== Number(tgUser.id)) {
     return json({ error: "You can only set your own scores" }, 403);
   }
 
   try {
     switch (body.action) {
       case "list":
-        return json(await buildList(db));
+        return json(await buildList(db, chatId));
 
       case "add": {
         const { name, tier, visited_on } = body;
@@ -204,7 +345,7 @@ export default async (request) => {
         return json({ ok: true });
 
       case "rate": {
-        const before = await buildList(db);
+        const before = await buildList(db, chatId);
         const wasComplete = before.entries.some((e) => e.id === Number(body.id));
         const row = { restaurant_id: body.id, telegram_id: body.personId, updated_at: new Date().toISOString() };
         for (const c of CATS) {
@@ -217,7 +358,7 @@ export default async (request) => {
 
         // Only shout when the place is finished, so the group isn't spammed
         // with a message per tap.
-        const fresh = await buildList(db);
+        const fresh = await buildList(db, chatId);
         const done = fresh.entries.find((e) => e.id === Number(body.id));
         if (done && !wasComplete) {
           const lines = [
@@ -471,22 +612,26 @@ export default async (request) => {
   }
 };
 
-async function buildList(db) {
+async function buildList(db, chatId) {
   const [{ data: places }, { data: people }] = await Promise.all([
     db
       .from("restaurants")
       .select("id, name, tier, visited_on, photo_url, logo_url, order_note, ratings(telegram_id, food, ambiance, aesthetics, service), visits(id, on_date, amount, paid_by)")
-      .eq("chat_id", chatId()),
-    db.from("people").select("telegram_id, display_name"),
+      .eq("chat_id", chatId),
+    // Scoped to this pair. The `people` table is global and would leak names
+    // from every other pair.
+    db.from("members").select("person_id, display_name").eq("chat_id", chatId),
   ]);
 
-  const roster = (people ?? []).map((p) => ({ id: Number(p.telegram_id), name: p.display_name }));
+  const roster = (people ?? [])
+    .filter((p) => p.person_id !== null)
+    .map((p) => ({ id: Number(p.person_id), name: p.display_name }));
   const needed = Math.max(2, roster.length);
 
   const { data: planRows } = await db
     .from("plans")
     .select("*")
-    .eq("chat_id", chatId())
+    .eq("chat_id", chatId)
     .eq("archived", false)
     .order("on_date", { ascending: true, nullsFirst: false });
   const upcoming = (planRows ?? []).map((p) => ({
@@ -496,7 +641,7 @@ async function buildList(db) {
   const { data: wishRows } = await db
     .from("wishlist")
     .select("id, name, tier, note")
-    .eq("chat_id", chatId())
+    .eq("chat_id", chatId)
     .order("created_at", { ascending: false });
   const wishlist = (wishRows ?? []).map((w) => ({ ...w, id: Number(w.id) }));
 
