@@ -345,7 +345,7 @@ export default async (request) => {
   try {
     switch (body.action) {
       case "list":
-        return json(await buildList(db, chatId));
+        return json(await buildList(db, chatId()));
 
       case "add": {
         const { name, tier, visited_on } = body;
@@ -397,7 +397,7 @@ export default async (request) => {
         return json({ ok: true });
 
       case "rate": {
-        const before = await buildList(db, chatId);
+        const before = await buildList(db, chatId());
         const wasComplete = before.entries.some((e) => e.id === Number(body.id));
         const row = { restaurant_id: body.id, telegram_id: body.personId, updated_at: new Date().toISOString() };
         for (const c of CATS) {
@@ -410,7 +410,7 @@ export default async (request) => {
 
         // Only shout when the place is finished, so the group isn't spammed
         // with a message per tap.
-        const fresh = await buildList(db, chatId);
+        const fresh = await buildList(db, chatId());
         const done = fresh.entries.find((e) => e.id === Number(body.id));
         if (done && !wasComplete) {
           const lines = [
