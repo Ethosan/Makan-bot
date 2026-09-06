@@ -744,11 +744,25 @@ function showWho() {
   $("eyebrow").textContent = "Which one are you?";
   const who = $("gate-who");
   who.hidden = false;
-  who.innerHTML = DATA.people.length
-    ? DATA.people.map((p,i) =>
-        '<button data-id="'+p.id+'"><i class="swatch" style="background:'+colour(i)+'"></i>'
-        + esc(p.name)+'</button>').join("")
-    : '<p class="note">Nobody here yet. Send the bot a message in Telegram first.</p>';
+  $("gate-note").textContent = "";
+
+  // An empty roster used to be a dead end with no way forward. Never again.
+  if (!DATA.people.length) {
+    $("eyebrow").textContent = "Almost there";
+    who.innerHTML = '<p class="gate-say" style="text-align:center">'
+      + 'We couldn\u2019t find anyone on this list yet.</p>';
+    $("gate-bar").style.display = "";
+    $("gate-go").textContent = "Try again";
+    $("gate-go").onclick = async () => {
+      try { DATA = await api("list"); showWho(); }
+      catch (e) { $("gate-note").textContent = e.message; }
+    };
+    return;
+  }
+
+  who.innerHTML = DATA.people.map((p,i) =>
+    '<button data-id="'+p.id+'"><i class="swatch" style="background:'+colour(i)+'"></i>'
+    + esc(p.name)+'</button>').join("");
   who.querySelectorAll("button").forEach(b => b.onclick = () => {
     ME = Number(b.dataset.id);
     localStorage.setItem("makan.me", ME);
