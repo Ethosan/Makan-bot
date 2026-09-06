@@ -52,30 +52,55 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   border-top:1px solid var(--rule);background:var(--paper);display:flex;gap:9px}
 
 /* ============ gate ============ */
-.gate{height:var(--app-h);width:var(--app-w);max-width:100%;margin:0 auto;display:grid;grid-template-rows:1fr auto;
+.gate{height:var(--app-h);width:var(--app-w);max-width:100%;margin:0 auto;display:grid;
+  grid-template-rows:auto 1fr auto;
   padding:calc(var(--pad) + var(--tg-top)) var(--pad) calc(var(--pad) + var(--tg-bottom))}
-.gate-mid{display:flex;flex-direction:column;justify-content:center;min-height:0}
-.mark{font-family:var(--serif);font-weight:400;font-size:clamp(56px,19vw,96px);
-  line-height:.86;letter-spacing:-.025em;margin:0}
+.gate-top{padding-top:6vh}
+.mark{font-family:var(--serif);font-weight:400;font-size:clamp(52px,17vw,86px);line-height:.86;
+  letter-spacing:-.025em;margin:0}
 .mark em{font-style:italic;color:var(--brass)}
-.tagline{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--muted);margin:14px 0 0}
-.pwfield{margin-top:38px;position:relative}
-.pwfield label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
-  text-transform:uppercase;color:var(--muted);margin-bottom:9px}
-.pwfield input{width:100%;padding:15px 52px 15px 2px;font-size:19px;font-family:var(--mono);
-  background:none;border:0;border-bottom:1.5px solid var(--rule);color:var(--ink);
-  letter-spacing:.16em;border-radius:0}
-.pwfield input:focus{outline:none;border-bottom-color:var(--ink)}
-.peek{position:absolute;right:0;bottom:6px;width:var(--tap);height:var(--tap);
-  background:none;border:0;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--muted)}
-.pick{display:flex;flex-direction:column;gap:9px;margin-top:30px}
+.eyebrow-g{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);margin:16px 0 0;display:flex;align-items:center;gap:10px}
+.eyebrow-g:after{content:"";flex:1;height:1px;background:var(--rule)}
+.gate-mid{display:flex;flex-direction:column;justify-content:center;min-height:0;padding:8px 0}
+
+/* One field treatment everywhere: a rule, not a box. */
+.gfield{position:relative;margin-bottom:26px}
+.gfield label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.gfield input{width:100%;padding:12px 44px 12px 2px;font-size:19px;font-family:var(--serif);
+  background:none;border:0;border-bottom:1.5px solid var(--rule);color:var(--ink);border-radius:0}
+.gfield input::placeholder{color:var(--rule)}
+.gfield input:focus{outline:none;border-bottom-color:var(--ink)}
+.gfield.mono input{font-family:var(--mono);font-size:18px;letter-spacing:.14em}
+.peek{position:absolute;right:0;bottom:4px;width:var(--tap);height:var(--tap);background:none;
+  border:0;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted)}
+.gate-say{font-size:15px;line-height:1.55;color:var(--muted);margin:0 0 4px}
+.gate-alt{display:block;width:100%;background:none;border:0;padding:14px 0 2px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted);text-align:center}
+.gate-alt:hover{color:var(--ink)}
+
+/* Sent / invite states: a panel rather than a stray line of text. */
+.gpanel{border:1px solid var(--rule);border-radius:6px;background:var(--card);padding:24px 20px;
+  text-align:center}
+.gpanel .to{font-family:var(--mono);font-size:13px;color:var(--ink);word-break:break-all;
+  margin:10px 0 0}
+.gpanel h2{font-family:var(--serif);font-weight:400;font-size:27px;line-height:1.2;margin:0}
+.gpanel p{font-size:14px;line-height:1.55;color:var(--muted);margin:12px 0 0}
+.codebox{font-family:var(--mono);font-size:38px;font-weight:500;letter-spacing:.22em;
+  text-indent:.22em;color:var(--ink);margin:4px 0 2px}
+.codelink{font-family:var(--mono);font-size:10.5px;color:var(--muted);word-break:break-all;
+  margin-top:14px;line-height:1.5}
+.pick{display:flex;flex-direction:column;gap:9px;margin-top:26px}
 .pick button{min-height:62px;padding:0 18px;border:1.5px solid var(--rule);background:var(--card);
-  border-radius:4px;font-family:var(--serif);font-size:25px;text-align:left;
-  display:flex;align-items:center;gap:13px}
+  border-radius:4px;font-family:var(--serif);font-size:25px;color:var(--ink);text-align:left;
+  display:flex;align-items:center;gap:12px}
 .pick button:hover{border-color:var(--ink)}
-.note{font-family:var(--mono);font-size:12px;color:var(--spark);margin-top:16px;min-height:18px}
+.note{font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--spark);
+  margin:14px 0 0;min-height:17px;text-align:center}
+.gate-bar{display:flex;gap:9px;padding-top:12px}
 
 /* ============ masthead ============ */
 .mast{padding:calc(12px + var(--tg-top)) var(--pad) 0;overflow:hidden}
@@ -314,25 +339,76 @@ fieldset{border:0;padding:0;margin:0}
 
 <!-- ============ gate ============ -->
 <div class="gate" id="gate">
-  <div class="gate-mid">
+  <div class="gate-top">
     <h1 class="mark">The<br>L<em>i</em>st</h1>
-    <p class="tagline" id="tagline">Everywhere we've eaten</p>
+    <p class="eyebrow-g" id="eyebrow">Everywhere we&rsquo;ve eaten</p>
+  </div>
 
-    <div id="gate-pw">
-      <div class="pwfield">
+  <div class="gate-mid">
+    <!-- sign in -->
+    <div id="g-signin" hidden>
+      <div class="gfield">
+        <label for="email">Your email</label>
+        <input type="email" id="email" autocomplete="email" enterkeyhint="go"
+               autocapitalize="off" autocorrect="off" placeholder="you@example.com">
+      </div>
+      <p class="gate-say">We&rsquo;ll send you a link. Nothing to remember, nothing to reset.</p>
+    </div>
+
+    <!-- link sent -->
+    <div id="g-sent" hidden>
+      <div class="gpanel">
+        <h2>Check your email</h2>
+        <p>We sent a link to</p>
+        <p class="to" id="sent-to"></p>
+        <p>Open it on this device and you&rsquo;ll be straight in. It can take a minute, and
+           it does sometimes land in spam.</p>
+      </div>
+    </div>
+
+    <!-- shared password -->
+    <div id="gate-pw" hidden>
+      <div class="gfield mono">
         <label for="pw">Password</label>
-        <input type="password" id="pw" autocomplete="current-password"
-               enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <input type="password" id="pw" autocomplete="current-password" enterkeyhint="go"
+               autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;">
         <button class="peek" id="peek" type="button" aria-pressed="false"
                 aria-label="Show password">Show</button>
       </div>
     </div>
 
+    <!-- first time -->
+    <div id="g-pair" hidden>
+      <div class="gfield">
+        <label for="p-name">What should we call you?</label>
+        <input type="text" id="p-name" autocapitalize="words" placeholder="Ethan" enterkeyhint="next">
+      </div>
+      <div class="gfield mono" id="code-field">
+        <label for="p-code">Invite code, if you have one</label>
+        <input type="text" id="p-code" autocapitalize="characters" placeholder="Leave blank"
+               enterkeyhint="go">
+      </div>
+      <p class="gate-say" id="pair-hint">One list, two people. Start it and you&rsquo;ll get a
+        link to send them.</p>
+    </div>
+
+    <!-- invite -->
+    <div id="g-code" hidden>
+      <div class="gpanel">
+        <h2>You&rsquo;re in</h2>
+        <p>Send them this code, or the link below</p>
+        <p class="codebox" id="codebox"></p>
+        <p class="codelink" id="codelink"></p>
+      </div>
+      <button class="gate-alt" id="copy">Copy the link</button>
+    </div>
+
     <div class="pick" id="gate-who" hidden role="group" aria-label="Who are you?"></div>
     <p class="note" id="gate-note" role="status" aria-live="polite"></p>
   </div>
-  <div class="bar" id="gate-bar" style="border-top:0;padding-left:0;padding-right:0">
-    <button class="btn" id="pw-go">Open the list</button>
+
+  <div class="gate-bar" id="gate-bar">
+    <button class="btn" id="gate-go">Continue</button>
   </div>
 </div>
 
@@ -463,66 +539,216 @@ function shrink(file) {
   });
 }
 
+/* ================= identity ================= */
+
+let SB = null;             // Supabase browser client, only for signing in
+let TOKEN = null;          // their session, sent with every call
+let CFG = null;
+let mode_ = "signin";      // signin | password | pair | code
+let INVITE = null;         // the pair's join link, once we have one
+// Arriving from someone's invite link.
+const JOIN_CODE = new URLSearchParams(location.search).get("join");
+
 async function api(action, payload = {}) {
   const res = await fetch("/api", {
     method:"POST", headers:{"content-type":"application/json"},
-    body: JSON.stringify({action, password: PW, initData: TG?.initData, ...payload})
+    body: JSON.stringify({action, password: PW, initData: TG?.initData,
+                          accessToken: TOKEN, ...payload})
   });
   let out;
-  try {
-    out = await res.json();
-  } catch {
-    // Non-JSON means the request never reached the function.
+  try { out = await res.json(); }
+  catch {
     throw new Error(res.status === 413
       ? "That photo is too large to upload."
       : "The server didn't respond (" + res.status + "). Try again.");
   }
-  if (!res.ok) throw new Error(out.error || "Something went wrong");
+  if (!res.ok) { const e = new Error(out.error || "Something went wrong"); e.data = out; throw e; }
   return out;
 }
 
-/* ================= gate ================= */
+const GATE = {
+  signin:   {pane:"g-signin", cta:"Send me a link",  eyebrow:"Sign in"},
+  sent:     {pane:"g-sent",   cta:"Open my email",   eyebrow:"Link sent"},
+  password: {pane:"gate-pw",  cta:"Open the list",   eyebrow:"Sign in"},
+  pair:     {pane:"g-pair",   cta:"Continue",        eyebrow:"Nearly there"},
+  code:     {pane:"g-code",   cta:"Send the link",   eyebrow:"Your invite"},
+};
+
+function showGate(which) {
+  mode_ = which;
+  if (which === "pair" && JOIN_CODE) {
+    $("p-code").value = JOIN_CODE;
+    $("code-field").hidden = true;
+    $("pair-hint").textContent = "You\u2019ve been invited. Pick a name and you\u2019re in.";
+  }
+  for (const g of Object.values(GATE)) $(g.pane).hidden = true;
+  $("gate-who").hidden = true;
+  $("gate-bar").style.display = "";
+  $("gate-note").textContent = "";
+
+  const cfg = GATE[which];
+  $(cfg.pane).hidden = false;
+  $("gate-go").textContent = cfg.cta;
+  $("eyebrow").textContent = cfg.eyebrow;
+
+  // The alternative route lives under the button, not buried in the form.
+  const alt = which === "signin" && CFG?.passwordEnabled ? "Use the shared password"
+    : which === "password" && CFG?.supabaseAnonKey ? "Sign in with email"
+    : which === "sent" ? "Use a different email"
+    : null;
+  let btn = $("alt-btn");
+  if (!alt) { btn?.remove(); }
+  else {
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.className = "gate-alt";
+      btn.id = "alt-btn";
+      $("gate-bar").parentNode.insertBefore(btn, $("gate-bar"));
+    }
+    btn.textContent = alt;
+    btn.onclick = () => showGate(which === "password" ? "signin"
+      : which === "sent" ? "signin" : "password");
+  }
+
+  setTimeout(() => $(cfg.pane).querySelector("input")?.focus(), 60);
+}
+
+async function shareInvite() {
+  if (!INVITE) return;
+  const payload = {title: "The List", text: "Join me on The List", url: INVITE};
+  try {
+    if (navigator.share) { await navigator.share(payload); return; }
+  } catch { /* they dismissed it */ }
+  await copyInvite();
+}
+
+async function copyInvite() {
+  if (!INVITE) return;
+  try {
+    await navigator.clipboard.writeText(INVITE);
+    $("gate-note").style.color = "var(--muted)";
+    $("gate-note").textContent = "Link copied.";
+  } catch {
+    $("gate-note").style.color = "var(--muted)";
+    $("gate-note").textContent = "Copy the link above and send it to them.";
+  }
+}
+
+$("copy").onclick = copyInvite;
 
 $("peek").onclick = () => {
   const on = $("pw").type === "password";
   $("pw").type = on ? "text" : "password";
   $("peek").textContent = on ? "Hide" : "Show";
   $("peek").setAttribute("aria-pressed", String(on));
-  $("peek").setAttribute("aria-label", on ? "Hide password" : "Show password");
 };
 
-$("pw-go").onclick = async () => {
+async function ensureSupabase() {
+  if (SB || !CFG?.supabaseAnonKey) return SB;
+  const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+  SB = createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, {
+    auth: { persistSession: true, detectSessionInUrl: true, flowType: "pkce" },
+  });
+  return SB;
+}
+
+$("gate-go").onclick = async () => {
   const note = $("gate-note");
+  note.style.color = "var(--spark)";
   note.textContent = "";
-  if (!$("pw").value) { note.textContent = "Enter the password to continue."; $("pw").focus(); return; }
-  $("pw-go").disabled = true;
-  $("pw-go").textContent = "Checking";
+  const btn = $("gate-go");
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = "\u2026";
+
   try {
-    PW = $("pw").value;
-    DATA = await api("list");
-    localStorage.setItem("makan.pw", PW);
-    (ME && DATA.people.some(p => p.id === ME)) ? start() : showWho();
+    if (mode_ === "signin") {
+      const email = $("email").value.trim();
+      if (!email) throw new Error("Enter your email.");
+      const sb = await ensureSupabase();
+      if (!sb) throw new Error("Email sign-in isn't set up. Use the shared password.");
+      const { error } = await sb.auth.signInWithOtp({
+        email, options: { emailRedirectTo: location.origin }
+      });
+      if (error) throw new Error(error.message);
+      $("sent-to").textContent = email;
+      showGate("sent");
+      return;
+    }
+
+    if (mode_ === "password") {
+      PW = $("pw").value;
+      if (!PW) throw new Error("Enter the password.");
+      await afterAuth();
+      return;
+    }
+
+    if (mode_ === "pair") {
+      const displayName = $("p-name").value.trim();
+      const code = $("p-code").value.trim();
+      if (!displayName) throw new Error("Tell us your name.");
+      if (code) {
+        await api("joinPair", {code, displayName});
+        await afterAuth();
+      } else {
+        const out = await api("createPair", {displayName});
+        INVITE = out.invite_url;
+        $("codebox").textContent = out.invite_code;
+        $("codelink").textContent = INVITE.replace(/^https?:\/\//, "");
+        showGate("code");
+      }
+      return;
+    }
+
+    if (mode_ === "sent") {
+      // Best effort: most phones open the default mail app from here.
+      location.href = "mailto:";
+      return;
+    }
+
+    if (mode_ === "code") { await shareInvite(); return; }
   } catch (e) {
+    note.style.color = "var(--spark)";
     note.textContent = e.message;
-    $("pw").select();
   } finally {
-    $("pw-go").disabled = false;
-    $("pw-go").textContent = "Open the list";
+    btn.disabled = false;
+    if (btn.textContent === "\u2026") btn.textContent = label;
   }
 };
-$("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("pw-go").click(); });
+
+[["email","gate-go"],["pw","gate-go"],["p-code","gate-go"]].forEach(([f]) =>
+  $(f)?.addEventListener("keydown", e => { if (e.key === "Enter") $("gate-go").click(); }));
+
+/** Called once we have some form of identity. Decides list, pair setup, or who-are-you. */
+async function afterAuth() {
+  const who = await api("whoami").catch(err => {
+    if (err.data?.needsPair) return {inPair: false};
+    throw err;
+  });
+
+  if (!who.inPair) { showGate("pair"); return; }
+  INVITE = who.invite_url ?? null;
+
+  if (PW && !who.verified) localStorage.setItem("makan.pw", PW);
+  if (who.me) { ME = who.me; localStorage.setItem("makan.me", ME); }
+
+  DATA = await api("list");
+  if (!ME || !DATA.people.some(p => p.id === ME)) { showWho(); return; }
+  start();
+}
 
 function showWho() {
-  $("gate-pw").hidden = true;
-  $("gate-bar").hidden = true;
-  $("tagline").textContent = "Which one are you?";
+  for (const g of Object.values(GATE)) $(g.pane).hidden = true;
+  $("alt-btn")?.remove();
+  $("gate-bar").style.display = "none";
+  $("eyebrow").textContent = "Which one are you?";
   const who = $("gate-who");
   who.hidden = false;
   who.innerHTML = DATA.people.length
     ? DATA.people.map((p,i) =>
         '<button data-id="'+p.id+'"><i class="swatch" style="background:'+colour(i)+'"></i>'
         + esc(p.name)+'</button>').join("")
-    : '<p class="note">Nobody has used the bot yet. Send it a message in Telegram first, then reload.</p>';
+    : '<p class="note">Nobody here yet. Send the bot a message in Telegram first.</p>';
   who.querySelectorAll("button").forEach(b => b.onclick = () => {
     ME = Number(b.dataset.id);
     localStorage.setItem("makan.me", ME);
@@ -609,8 +835,9 @@ function render() {
   renderKey();
   renderNav();
 
+  const banner = inviteBanner();
   const strip = statsStrip();
-  let html = (strip && DATA.entries.length >= 2 ? strip : "") + (list.length
+  let html = banner + (strip && DATA.entries.length >= 2 ? strip : "") + (list.length
     ? list.map((e,i) => rowHtml(e, filter === "all" ? e.overallRank : i+1)).join("")
     : '<p class="empty">Nothing here yet.<br>Add a place below.</p>');
 
@@ -620,7 +847,9 @@ function render() {
   $("board").innerHTML = html;
   $("board").querySelectorAll("[data-open]").forEach(b =>
     b.onclick = () => openDetail(Number(b.dataset.open)));
-  const statsBtn = $("board").querySelector(".stats");
+  const inviteBtn = $("invite-b");
+  if (inviteBtn) inviteBtn.onclick = shareInvite;
+  const statsBtn = $("board").querySelector(".stats:not(#invite-b)");
   if (statsBtn) statsBtn.onclick = openStats;
 
   $("app").querySelector(".bar").innerHTML =
@@ -628,6 +857,13 @@ function render() {
     + '<button class="btn" id="add">+ Add a place</button>';
   $("roll").onclick = rollAgain;
   $("add").onclick = () => openForm(null);
+}
+
+/** Still on your own? The link stays one tap away. */
+function inviteBanner() {
+  if (!INVITE || (DATA.people ?? []).length > 1) return "";
+  return '<button class="stats" id="invite-b"><span>Just you so far \u2014 '
+    + '<b>send the invite link</b></span><i>Share</i></button>';
 }
 
 function renderKey() {
@@ -1660,25 +1896,24 @@ async function save() {
 /* ================= boot ================= */
 
 (async () => {
-  if (TG) {
-    try {
-      const who = await api("whoami");
-      if (who.verified) {
-        ME = who.me;
-        DATA = await api("list");
-        start();
-        return;
-      }
-    } catch { /* fall through to the password */ }
+  try { CFG = await api("config"); } catch {}
+
+  // A magic-link return lands here with a session in the URL.
+  if (CFG?.supabaseAnonKey) {
+    const sb = await ensureSupabase();
+    const { data } = await sb.auth.getSession();
+    if (data?.session) {
+      TOKEN = data.session.access_token;
+      history.replaceState(null, "", location.pathname);
+      try { await afterAuth(); return; } catch {}
+    }
   }
-  if (!PW) { $("pw").focus(); return; }
-  try {
-    DATA = await api("list");
-    (ME && DATA.people.some(p => p.id === ME)) ? start() : showWho();
-  } catch {
-    localStorage.removeItem("makan.pw");
-    $("pw").focus();
-  }
+
+  if (TG) { try { await afterAuth(); return; } catch {} }
+
+  if (PW) { try { await afterAuth(); return; } catch { localStorage.removeItem("makan.pw"); PW = ""; } }
+
+  showGate(CFG?.supabaseAnonKey ? "signin" : "password");
 })();
 </script>
 </body>
