@@ -623,9 +623,18 @@ async function buildList(db, chatId) {
     db.from("members").select("person_id, display_name").eq("chat_id", chatId),
   ]);
 
-  const roster = (people ?? [])
+  let roster = (people ?? [])
     .filter((p) => p.person_id !== null)
     .map((p) => ({ id: Number(p.person_id), name: p.display_name }));
+
+  // Fallback for the original pair: if `members` is empty or the table doesn't
+  // exist yet, read the old global `people` table so the app keeps working
+  // whatever state the migrations are in. Scoped to the legacy chat so a new
+  // pair can never pick up someone else's names.
+  if (!roster.length && chatId === legacyChatId()) {
+    const { data: legacy } = await db.from("people").select("telegram_id, display_name");
+    roster = (legacy ?? []).map((p) => ({ id: Number(p.telegram_id), name: p.display_name }));
+  }
   const needed = Math.max(2, roster.length);
 
   const { data: planRows } = await db
