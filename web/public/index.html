@@ -643,13 +643,21 @@ $("peek").onclick = () => {
   $("peek").setAttribute("aria-pressed", String(on));
 };
 
+/** Loads the auth library. Returns null if the CDN is unreachable — sign-in is
+ *  optional, and it must never take the whole page down with it. */
 async function ensureSupabase() {
-  if (SB || !CFG?.supabaseAnonKey) return SB;
-  const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
-  SB = createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, {
-    auth: { persistSession: true, detectSessionInUrl: true, flowType: "pkce" },
-  });
-  return SB;
+  if (SB) return SB;
+  if (!CFG?.supabaseAnonKey) return null;
+  try {
+    const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+    SB = createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, {
+      auth: { persistSession: true, detectSessionInUrl: true, flowType: "pkce" },
+    });
+    return SB;
+  } catch (e) {
+    console.error("auth library failed to load", e);
+    return null;
+  }
 }
 
 $("gate-go").onclick = async () => {
@@ -666,7 +674,9 @@ $("gate-go").onclick = async () => {
       const email = $("email").value.trim();
       if (!email) throw new Error("Enter your email.");
       const sb = await ensureSupabase();
-      if (!sb) throw new Error("Email sign-in isn't set up. Use the shared password.");
+      if (!sb) throw new Error(CFG?.supabaseAnonKey
+        ? "Couldn't load sign-in. Check your connection, or use the shared password."
+        : "Email sign-in isn't switched on yet. Use the shared password.");
       const { error } = await sb.auth.signInWithOtp({
         email, options: { emailRedirectTo: location.origin }
       });
@@ -1910,24 +1920,36 @@ async function save() {
 /* ================= boot ================= */
 
 (async () => {
-  try { CFG = await api("config"); } catch {}
+  try {
+    try { CFG = await api("config"); } catch { /* password-only, then */ }
 
-  // A magic-link return lands here with a session in the URL.
-  if (CFG?.supabaseAnonKey) {
-    const sb = await ensureSupabase();
-    const { data } = await sb.auth.getSession();
-    if (data?.session) {
-      TOKEN = data.session.access_token;
-      history.replaceState(null, "", location.pathname);
-      try { await afterAuth(); return; } catch {}
+    // A magic-link return lands here with a session in the URL.
+    if (CFG?.supabaseAnonKey) {
+      const sb = await ensureSupabase();
+      if (sb) {
+        const { data } = await sb.auth.getSession();
+        if (data?.session) {
+          TOKEN = data.session.access_token;
+          history.replaceState(null, "", location.pathname);
+          try { await afterAuth(); return; } catch (e) { console.error(e); }
+        }
+      }
+    }
+
+    if (TG) { try { await afterAuth(); return; } catch (e) { console.error(e); } }
+
+    if (PW) {
+      try { await afterAuth(); return; }
+      catch (e) { console.error(e); localStorage.removeItem("makan.pw"); PW = ""; }
+    }
+  } catch (e) {
+    console.error("startup", e);
+  } finally {
+    // Whatever went wrong above, there must always be a way in.
+    if ($("app").hidden && $("gate-who").hidden) {
+      showGate(CFG?.supabaseAnonKey ? "signin" : "password");
     }
   }
-
-  if (TG) { try { await afterAuth(); return; } catch {} }
-
-  if (PW) { try { await afterAuth(); return; } catch { localStorage.removeItem("makan.pw"); PW = ""; } }
-
-  showGate(CFG?.supabaseAnonKey ? "signin" : "password");
 })();
 </script>
 </body>
