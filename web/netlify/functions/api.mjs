@@ -197,6 +197,58 @@ async function pairIsFull(db, chat_id) {
 }
 
 export default async (request) => {
+  // Diagnostic: open /api?diag=1 in a browser. Counts and flags only, no names,
+  // no data. Tells us exactly what the function sees rather than what we assume.
+  const url = new URL(request.url);
+  if (request.method === "GET" && url.searchParams.get("diag")) {
+    const db = sb();
+    const raw = process.env.CHAT_ID ?? null;
+    const id = legacyChatId();
+    const out = {
+      env: {
+        CHAT_ID_raw: raw,
+        CHAT_ID_parsed: id,
+        CHAT_ID_has_whitespace: raw !== null && raw !== raw.trim(),
+        SITE_PASSWORD_set: Boolean(process.env.SITE_PASSWORD),
+        SUPABASE_URL_set: Boolean(process.env.SUPABASE_URL),
+        SUPABASE_SERVICE_KEY_set: Boolean(process.env.SUPABASE_SERVICE_KEY),
+        SUPABASE_ANON_KEY_set: Boolean(process.env.SUPABASE_ANON_KEY),
+        BOT_TOKEN_set: Boolean(process.env.BOT_TOKEN),
+      },
+      db: {},
+    };
+    try {
+      const [mAll, mMine, rAll, rMine, pAll] = await Promise.all([
+        db.from("members").select("chat_id, person_id"),
+        db.from("members").select("person_id").eq("chat_id", id),
+        db.from("restaurants").select("chat_id"),
+        db.from("restaurants").select("id").eq("chat_id", id),
+        db.from("people").select("telegram_id"),
+      ]);
+      out.db = {
+        members_total: (mAll.data ?? []).length,
+        members_chat_ids: [...new Set((mAll.data ?? []).map((m) => String(m.chat_id)))],
+        members_missing_person_id: (mAll.data ?? []).filter((m) => m.person_id === null).length,
+        members_for_CHAT_ID: (mMine.data ?? []).length,
+        restaurants_total: (rAll.data ?? []).length,
+        restaurants_chat_ids: [...new Set((rAll.data ?? []).map((r) => String(r.chat_id)))],
+        restaurants_for_CHAT_ID: (rMine.data ?? []).length,
+        people_total: (pAll.data ?? []).length,
+        errors: [mAll, mMine, rAll, rMine, pAll]
+          .map((r) => r.error?.message).filter(Boolean),
+      };
+      const built = await buildList(db, id);
+      out.buildList = {
+        roster: built.people.length,
+        rated: built.entries.length,
+        pending: built.pending.length,
+      };
+    } catch (e) {
+      out.db.threw = e?.message ?? String(e);
+    }
+    return json(out);
+  }
+
   if (request.method !== "POST") return json({ error: "POST only" }, 405);
 
   let body;
