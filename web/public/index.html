@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -1145,33 +1146,6 @@ function openStats() {
     + '<div class="card"><span class="card-k">Closest</span>'
     + '<p class="card-n">' + esc(st.closest.name) + '</p>'
     + '<p class="card-v">' + st.closest.gap.toFixed(2) + ' apart</p></div>';
-
-  if (st.priced) {
-    body += '<p class="eyebrow">What it costs</p>'
-      + '<div class="s-hero" style="border-bottom:0;padding-bottom:10px">'
-      + '<p class="s-num">' + money(st.totalSpend) + '</p>'
-      + '<p class="s-said" style="font-size:17px">across ' + st.priced
-      + ' logged bill' + (st.priced === 1 ? "" : "s") + '</p></div>';
-
-    if (st.tierSpend.length) {
-      const maxT = Math.max(...st.tierSpend.map(t => t.avg));
-      body += st.tierSpend.map(t =>
-        '<div class="pair"><span class="pair-l">' + TIER_LABEL[t.tier].split(" ")[0] + '</span>'
-        + '<span class="s-track"><span class="s-axis"></span>'
-        + '<span class="s-span" style="left:0;width:' + Math.max(4, (t.avg / maxT) * 100)
-        + '%;background:var(--brass);opacity:.85"></span></span>'
-        + '<span class="pair-v">' + money(t.avg) + '</span></div>').join("");
-    }
-
-    if (st.misfiled.length) {
-      body += '<div class="card"><span class="card-k">Costs like fancy</span>'
-        + '<p class="card-n">' + st.misfiled.map(e => esc(e.name)).join(", ") + '</p>'
-        + '<p class="card-v">Filed cheaper, but averaging '
-        + st.misfiled.map(e => money(e.avgSpend)).join(", ")
-        + '. Worth re-tiering \u2014 the weights are wrong for them.</p></div>';
-    }
-
-  }
 
   body += '<p class="eyebrow">By tier</p>'
     + st.tiers.map(t => {
