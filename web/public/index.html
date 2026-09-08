@@ -1171,12 +1171,6 @@ function openStats() {
         + '. Worth re-tiering \u2014 the weights are wrong for them.</p></div>';
     }
 
-    if (st.imbalance >= 1) {
-      body += '<div class="card"><span class="card-k">Out of pocket</span>'
-        + '<p class="card-n">' + esc(st.ahead[0].name.split(" ")[0]) + ' is up '
-        + money(st.imbalance) + '</p>'
-        + '<p class="card-v">Counting split bills as even. Lifetime, never settled.</p></div>';
-    }
   }
 
   body += '<p class="eyebrow">By tier</p>'
