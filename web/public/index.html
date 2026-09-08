@@ -76,6 +76,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .peek{position:absolute;right:0;bottom:4px;width:var(--tap);height:var(--tap);background:none;
   border:0;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--muted)}
+.opt{opacity:.62;text-transform:none;letter-spacing:0}
 .gate-say{font-size:15px;line-height:1.55;color:var(--muted);margin:0 0 4px}
 .gate-alt{display:block;width:100%;background:none;border:0;padding:14px 0 2px;
   font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
@@ -104,7 +105,13 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 /* ============ masthead ============ */
 .mast{padding:calc(12px + var(--tg-top)) var(--pad) 0;overflow:hidden}
-.mast-row{border-bottom:2px solid var(--ink);padding-bottom:8px;overflow:hidden}
+.mast-row{border-bottom:2px solid var(--ink);padding-bottom:8px;overflow:hidden;
+  display:flex;align-items:baseline;gap:10px}
+.mast-row h1{flex:1;min-width:0}
+.signout{flex:none;background:none;border:0;padding:4px 0;font-family:var(--mono);
+  font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+  cursor:pointer}
+.signout:hover{color:var(--ink)}
 .mast-row h1{font-family:var(--serif);font-weight:400;font-size:32px;line-height:1;margin:0;
   white-space:nowrap}
 /* Own line, wrapping. A title-and-names row is the one pair guaranteed to be
@@ -162,6 +169,15 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .order-k{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
   text-transform:uppercase;color:var(--muted);margin-bottom:5px}
 .visits{margin-top:8px}
+.visit-row{display:flex;align-items:baseline;gap:10px;padding:7px 0;
+  border-bottom:1px solid var(--rule)}
+.visit-row .v-when{font-family:var(--mono);font-size:11px;flex:none}
+.visit-row .v-meta{flex:1;min-width:0;font-size:12px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v-act{flex:none;background:none;border:0;padding:2px 0;font-family:var(--mono);
+  font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+  cursor:pointer}
+.v-act:hover{color:var(--ink)}
 .visit-row{display:flex;justify-content:space-between;align-items:center;gap:12px;
   font-family:var(--mono);font-size:11px;color:var(--muted);padding:8px 0;
   border-bottom:1px dotted var(--rule)}
@@ -352,7 +368,15 @@ fieldset{border:0;padding:0;margin:0}
         <input type="email" id="email" autocomplete="email" enterkeyhint="go"
                autocapitalize="off" autocorrect="off" placeholder="you@example.com">
       </div>
-      <p class="gate-say">We&rsquo;ll send you a link. Nothing to remember, nothing to reset.</p>
+      <div class="gfield mono">
+        <label for="epw">Password <span class="opt">&mdash; leave blank for a link</span></label>
+        <input type="password" id="epw" autocomplete="current-password" enterkeyhint="go"
+               autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;">
+        <button class="peek" id="epeek" type="button" aria-pressed="false"
+                aria-label="Show password">Show</button>
+      </div>
+      <p class="gate-say">Enter your password, or leave it blank and we&rsquo;ll email you a link
+        instead.</p>
     </div>
 
     <!-- link sent -->
@@ -417,6 +441,7 @@ fieldset{border:0;padding:0;margin:0}
   <header class="mast">
     <div class="mast-row">
       <h1>The List</h1>
+      <button class="signout" id="signout" type="button">Sign out</button>
     </div>
     <div class="key" id="key"></div>
     <nav class="modes" id="modes" aria-label="Which list"></nav>
@@ -567,7 +592,7 @@ async function api(action, payload = {}) {
 }
 
 const GATE = {
-  signin:   {pane:"g-signin", cta:"Send me a link",  eyebrow:"Sign in"},
+  signin:   {pane:"g-signin", cta:"Continue",        eyebrow:"Sign in"},
   sent:     {pane:"g-sent",   cta:"Open my email",   eyebrow:"Link sent"},
   password: {pane:"gate-pw",  cta:"Open the list",   eyebrow:"Sign in"},
   pair:     {pane:"g-pair",   cta:"Continue",        eyebrow:"Nearly there"},
@@ -636,6 +661,17 @@ async function copyInvite() {
 
 $("copy").onclick = copyInvite;
 
+$("signout").onclick = () => {
+  if (confirm("Sign out of The List?")) signOut();
+};
+
+$("epeek").onclick = () => {
+  const on = $("epw").type === "password";
+  $("epw").type = on ? "text" : "password";
+  $("epeek").textContent = on ? "Hide" : "Show";
+  $("epeek").setAttribute("aria-pressed", String(on));
+};
+
 $("peek").onclick = () => {
   const on = $("pw").type === "password";
   $("pw").type = on ? "text" : "password";
@@ -677,6 +713,20 @@ $("gate-go").onclick = async () => {
       if (!sb) throw new Error(CFG?.supabaseAnonKey
         ? "Couldn't load sign-in. Check your connection, or use the shared password."
         : "Email sign-in isn't switched on yet. Use the shared password.");
+
+      // A password signs in straight away. Blank falls back to the emailed
+      // link, which needs no password to have been set.
+      const pw = $("epw").value;
+      if (pw) {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+        if (error) throw new Error(error.message === "Invalid login credentials"
+          ? "That email and password don't match. Leave the password blank to get a link instead."
+          : error.message);
+        TOKEN = data.session.access_token;
+        await afterAuth();
+        return;
+      }
+
       const { error } = await sb.auth.signInWithOtp({
         email, options: { emailRedirectTo: location.origin }
       });
@@ -779,6 +829,15 @@ function showWho() {
     start();
   });
   who.querySelector("button")?.focus();
+}
+
+/** Clears every way we remember them, then starts over at the gate. */
+async function signOut() {
+  localStorage.removeItem("makan.pw");
+  localStorage.removeItem("makan.me");
+  PW = ""; ME = null; TOKEN = null; DATA = null;
+  try { if (SB) await SB.auth.signOut(); } catch (e) { console.error(e); }
+  location.replace(location.pathname);
 }
 
 function start() {
@@ -1612,9 +1671,19 @@ function openDetail(id) {
         ? '<p class="d-lab" style="font-family:var(--mono);font-size:10px;letter-spacing:.15em;'
           + 'text-transform:uppercase;color:var(--muted);margin:24px 0 2px">Been '
           + e.visits.length + (e.visits.length === 1 ? " time" : " times") + '</p>'
-          + '<div class="visits">' + e.visits.map(v =>
-              '<div class="visit-row"><span>' + esc(v.on_date) + '</span>'
-              + '<span>' + (ago(v.on_date) || "") + '</span></div>').join("")
+          + '<div class="visits">' + e.visits.map(v => {
+              const who = v.paid_by == null ? "split"
+                : ((DATA.people.find(p => p.id === v.paid_by)?.name || "")
+                    .trim().split(" ")[0] || "them") + " paid";
+              const bill = v.amount != null ? "$" + v.amount : "";
+              return '<div class="visit-row">'
+                + '<span class="v-when">' + esc(v.on_date) + '</span>'
+                + '<span class="v-meta">' + esc([bill, v.amount != null || v.paid_by != null
+                    ? who : ""].filter(Boolean).join(" \u00b7 ") || (ago(v.on_date) || "")) + '</span>'
+                + '<button class="v-act" data-editvisit="' + v.id + '">Edit</button>'
+                + '<button class="v-act" data-visit="' + v.id + '">Remove</button>'
+                + '</div>';
+            }).join("")
           + '</div>'
         : "")
     + "</div>");
@@ -1666,10 +1735,10 @@ function openVisitForm(e, visit) {
   let payer = visit ? (visit.paid_by ?? null) : null;
 
   panelClose();
-  panelOpen(visit ? "Change the date" : "Been again",
+  panelOpen(visit ? "Edit this visit" : "Been again",
     '<div class="step">'
     + '<h3 class="q">' + esc(e.name) + '</h3>'
-    + '<p class="q-hint">When did you go' + (visit ? "" : " back") + '?</p>'
+    + '<p class="q-hint">' + (visit ? "Date, bill, and who paid." : "When did you go back?") + '</p>'
     + '<div class="field"><label for="v-date">Date</label>'
     + '<input type="date" id="v-date" value="' + value + '" max="' + today + '"></div>'
     + '<div class="seg" id="v-quick">'
